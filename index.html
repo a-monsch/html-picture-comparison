@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Compare</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 95vh; /* overall window height */
+    }
+    
+  </style>
+</head>
+<body>
+  <h1>Compare</h1>
+  <!-- Global buttons -->
+  <button class="global-add-button" id="globalAddBtn" title="Add new column">Add Column (right)</button>
+  <button class="global-prev-button" id="prevBtn" title="Previous Picture">◄</button>
+  <button class="global-next-button" id="nextBtn" title="Next Picture">►</button>
+  <!-- Picture status indicator -->
+  <div id="pictureStatus"></div>
+  <div id="columns" class="column-container"></div>
+
+  <script>
+    // Global variables
+    let activeColumns = [];  // each column record holds its available files etc.
+    let currentMasterOrder = []; // Master list from file_order.json (assumed common across all)
+    let currentPictureIndex = 0; // Global pointer for the common picture
+  </script>
+  <script src="js/generateId.js"></script>
+  <script src="js/populateFolderSuggestions.js"></script>
+  <script src="js/updateDisplayedPicture.js"></script>
+  <script src="js/selectSuggestion.js"></script>
+  <script src="js/createColumn.js"></script>
+  <script src="js/adjustColumnWidths.js"></script>
+  <script src="js/addColumn.js"></script>
+  <script src="js/fetchFolders.js"></script>
+  <script src="js/fetchChannels.js"></script>
+  <script src="js/getUnionFiles.js"></script>
+  <script src="js/globalButtonFunctionality.js"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+.dropdown-container {
+    margin-bottom: 20px;
+}
+
+.dropdown {
+    width: 200px;
+    padding: 10px;
+    margin-right: 10px;
+}
+
+.add-dropdown {
+    cursor: pointer;
+    font-size: 20px;
+    color: #007BFF;
+}
+
+.add-dropdown:hover {
+    text-decoration: underline;
+}
+
+.hidden {
+    display: none;
+}
+
+.error {
+    color: red;
+    font-weight: bold;
+}
+
+/* Container fills 90% of viewport height */
+.column-container {
+    display: flex;
+    flex-direction: row;
+    height: 90vh;
+}
+/* Each column wrapper will have its width adjusted */
+.col-wrapper {
+    position: relative;
+    height: 100%;
+    margin-right: 10px;
+}
+/* Global buttons positioned at top right */
+.global-add-button, .global-prev-button, .global-next-button {
+    position: fixed;
+    top: 10px;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 10px 15px;
+    z-index: 10;
+}
+.global-add-button {
+    right: 10px;
+}
+.global-prev-button {
+    right: 280px;
+}
+.global-next-button {
+    right: 220px;
+}
+/* New remove column button positioned at top left */
+.global-remove-button {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 10px 15px;
+    z-index: 10;
+}
+/* Each column uses its intrinsic scrollbar */
+.column {
+    border: 1px solid #ccc;
+    padding: 10px;
+    overflow: auto;
+    height: 100%;
+    box-sizing: border-box;
+    position: relative;
+}
+.image-container {
+    /* Display one image (or placeholder) per column */
+    height: calc(100% - 100px);
+    overflow-y: auto;
+    margin-top: 0px;
+}
+.column input {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 5px;
+    box-sizing: border-box;
+}
+/* Folder suggestions dropdown */
+.folder-suggestions {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #ccc;
+    width: 100%;
+    z-index: 5;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.folder-suggestion-item {
+    padding: 8px;
+    cursor: pointer;
+}
+.folder-suggestion-item.highlighted {
+    background: #ddd;
+}
