@@ -1,11 +1,21 @@
 // Global next and previous button functionality.
 document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stateParam = urlParams.get('state');
+    if (stateParam) {
+      const columnsData = stateParam.split('|').map(colState => {
+        const [title, folder, channel] = colState.split(',').map(s => decodeURIComponent(s));
+        return { title, folder, channel };
+      });
+      columnsData.forEach(data => addColumn(data));
+    } else {
+      addColumn();
+      addColumn();
+    }
+    
+    
     document.getElementById('globalAddBtn').addEventListener('click', addColumn);
 
-    // Create two columns initially.
-    addColumn();
-    addColumn();
-    
     document.getElementById('prevBtn').addEventListener('click', () => {
     let unionFiles = getUnionFiles();
     if (unionFiles.length === 0) return;
@@ -25,6 +35,22 @@ document.addEventListener('DOMContentLoaded', () => {
     } while (unionFiles.length && !activeColumns.some(c => c.availableFiles.includes(unionFiles[currentPictureIndex].png)));
     updateDisplayedPicture();
     });
+    
+});
+
+// Permalink button click handler
+document.getElementById('permalinkBtn').addEventListener('click', () => {
+  const state = activeColumns.map(col => {
+    const title = col.title || 'Column Title';
+    const folder = col.folder || '';
+    const channel = col.channel || '';
+    return encodeURIComponent(title) + ',' + encodeURIComponent(folder) + ',' + encodeURIComponent(channel);
+  }).join('|');
+  const url = new URL(window.location);
+  url.searchParams.set('state', state);
+  navigator.clipboard.writeText(url.href).then(() => {
+    alert('Permalink copied to clipboard!');
+  });
 });
 
 document.addEventListener('keydown', (e) => {

@@ -115,3 +115,28 @@ h1 {
 .folder-suggestion-item.highlighted {
     background: #ddd;
 }
+.column-title {
+    width: 95%;
+    margin-bottom: 10px;
+    padding: 5px;
+    font-size: 20px;       /* Increased font size */
+    font-weight: bold;     /* Bold text */
+    border: none;          /* No border */
+    background-color: transparent; /* Invisible background */
+}
+.global-permalink-button {
+  position: fixed;
+  top: 10px;
+  left: 100px;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 10px 15px;
+  z-index: 10;
+}
+.deleteBtn {
+    width: 5% !important;
+    aspect-ratio: 1 !important;
+    border: none !important;
+    background-color: #f00 !important;
+    cursor: pointer !important;
+}

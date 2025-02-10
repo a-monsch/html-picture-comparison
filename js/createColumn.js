@@ -1,8 +1,14 @@
 // Create a new column.
-function createColumn() {
+function createColumn(initialData) {
   const col = document.createElement('div');
   col.className = 'column';
   col.dataset.syncId = generateId();
+
+  // Title input
+  const titleInput = document.createElement('input');
+  titleInput.className = 'column-title';
+  titleInput.placeholder = 'Column Title';
+  col.appendChild(titleInput);
 
   // Search input for regex filtering.
   const searchInput = document.createElement('input');
@@ -126,7 +132,8 @@ function createColumn() {
   deleteBtn.style.top = '2px';
   deleteBtn.style.right = '0%';
   deleteBtn.style.width = '5%';
-  deleteBtn.style.height = '48px';
+  deleteBtn.style.aspectRatio = '1';
+  // deleteBtn.style.height = '48px';
   deleteBtn.addEventListener('click', () => {
     const colWrapper = col.parentNode;
     if (colWrapper && colWrapper.parentNode) {
@@ -138,9 +145,27 @@ function createColumn() {
   });
   col.appendChild(deleteBtn);
 
+  // Initialize with data if provided
+  if (initialData) {
+    titleInput.value = initialData.title;
+    if (initialData.folder) {
+      searchInput.value = initialData.folder;
+      searchInput.setAttribute('data-selected', initialData.folder);
+      searchInput.dispatchEvent(new Event('change'));
+      // Set channel after a delay to allow channel fetch
+      setTimeout(() => {
+        if (initialData.channel) {
+          channelSelect.value = initialData.channel;
+          channelSelect.dispatchEvent(new Event('change'));
+        }
+      }, 500);
+    }
+  }
+
   // Record for this column.
   const colData = {
     col: col,
+    title: titleInput.value,
     searchInput: searchInput,
     suggestionsContainer: suggestionsContainer,
     channelSelect: channelSelect,
@@ -149,6 +174,10 @@ function createColumn() {
     channel: null,
     availableFiles: []  // Populated on channel selection.
   };
+
+  titleInput.addEventListener('input', () => {
+    colData.title = titleInput.value;
+  });
 
   // When channel is selected, load available images and synchronize channel selection.
   channelSelect.addEventListener('change', () => {
