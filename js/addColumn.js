@@ -66,6 +66,7 @@ function addColumn(state) {
         const channelSelect = column.querySelector('select');
         // Clear out any existing options.
         channelSelect.innerHTML = '';
+        // Always show default prompt option.
         channelSelect.appendChild(new Option('Select Channel', ''));
         // Filter duplicates minimally.
         const seen = new Set();
@@ -76,10 +77,13 @@ function addColumn(state) {
             channelSelect.appendChild(new Option(ch.label.trim(), trimmed));
           }
         });
-        channelSelect.style.display = channelSelect.options.length > 1 ? 'block' : 'none';
-        // Set the remembered channel.
-        channelSelect.value = state.channel;
-        column.dataset.channel = state.channel;
+        // Always ensure the dropdown is visible.
+        channelSelect.style.display = 'block';
+        // If exactly one channel option exists (plus the default), auto-select it.
+        if (channelSelect.options.length === 2) {
+          channelSelect.value = channelSelect.options[1].value;
+          column.dataset.channel = channelSelect.options[1].value;
+        }
       })
       .catch(err => console.error("Error fetching channels:", err));
   }
