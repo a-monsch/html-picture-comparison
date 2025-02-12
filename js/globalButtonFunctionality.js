@@ -54,9 +54,22 @@ document.getElementById('permalinkBtn').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (e) => {
-    if(e.key === 'ArrowRight') {
+  // If focus is in an input field that is either the title or search box, ignore arrow keys.
+  const active = document.activeElement;
+  if (
+    active &&
+    active.tagName === "INPUT" &&
+    (
+      active.classList.contains("column-title") ||
+      (active.placeholder && active.placeholder.includes("Search folder paths"))
+    )
+  ) {
+    return;
+  }
+  
+  if (e.key === 'ArrowRight') {
     document.getElementById('nextBtn').click();
-    } else if(e.key === 'ArrowLeft') {
+  } else if (e.key === 'ArrowLeft') {
     document.getElementById('prevBtn').click();
-    }
+  }
 });
