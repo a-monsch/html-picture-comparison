@@ -118,7 +118,8 @@ function createColumn(initialData) {
         channels.forEach(ch => {
           channelSelect.appendChild(new Option(ch.label, ch.value));
         });
-        channelSelect.style.display = channels.length ? 'block' : 'none';
+        channelSelect.style.display = (hasLevel2 && channels.length) ? 'block' : 'none';
+        if (!hasLevel2) channelSelect.dispatchEvent(new Event('change')); // Auto-trigger load
       });
     } else {
       channelSelect.style.display = 'none';
@@ -186,7 +187,7 @@ function createColumn(initialData) {
     colData.folder = folder;
     colData.channel = channel;
     imageContainer.innerHTML = '';
-    if (folder && channel && channel !== '') {
+    if (folder && (!hasLevel2 || (channel && channel !== ''))) {
       fetch('data/file_order.json')
         .then(response => response.json())
         .then(file_order => {
@@ -196,7 +197,9 @@ function createColumn(initialData) {
           let pngFiles = file_order.filter(obj => obj.png && obj.png.toLowerCase().endsWith('.png'));
           let loadPromises = pngFiles.map(obj => new Promise(resolve => {
             const img = new Image();
-            img.src = `data/${folder}/${channel}/${obj.png}`;
+            img.src = hasLevel2 ? // <-- MODIFY
+              `data/${folder}/${channel}/${obj.png}` :
+              `data/${folder}/${obj.png}`;
             img.onload = () => resolve({ file: obj.png, exists: true });
             img.onerror = () => resolve({ file: obj.png, exists: false });
           }));
@@ -215,7 +218,7 @@ function createColumn(initialData) {
     }
 
     // Synchronize channel selection across all other columns.
-    if (!window._isSyncingChannel) {
+    if (hasLevel2 && !window._isSyncingChannel) {
       window._isSyncingChannel = true;
       activeColumns.forEach(otherCol => {
         if (otherCol === colData) return;

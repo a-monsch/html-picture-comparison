@@ -28,7 +28,11 @@ function updateDisplayedPicture() {
       pictureWrapper.style.justifyContent = "center";
       // Create the image element and adjust dimensions to fill the container while preserving aspect ratio.
       const img = document.createElement('img');
-      img.src = `data/${columnObj.folder}/${columnObj.channel}/${fileObj.png}`;
+      if (hasLevel2) { // <-- ADD
+        img.src = `data/${columnObj.folder}/${columnObj.channel}/${fileObj.png}`;
+        } else {
+        img.src = `data/${columnObj.folder}/${fileObj.png}`;
+      }
       img.style.maxWidth = "100%";
       img.style.maxHeight = "100%";
       img.style.objectFit = "contain";
@@ -38,7 +42,11 @@ function updateDisplayedPicture() {
       // Append the PDF link below the picture.
       if (fileObj.pdf) {
         const link = document.createElement('a');
-        link.href = `data/${columnObj.folder}/${columnObj.channel}/${fileObj.pdf}`;
+        if (hasLevel2) { // <-- ADD
+          link.href = `data/${columnObj.folder}/${columnObj.channel}/${fileObj.pdf}`;
+        } else {
+          link.href = `data/${columnObj.folder}/${fileObj.pdf}`;
+        }
         link.textContent = "View PDF";
         link.target = "_blank";
         link.style.display = 'block';
