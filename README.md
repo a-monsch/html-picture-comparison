@@ -41,15 +41,3 @@ This repository supports two operating modes based on your folder structure:
      ```sh
      python3 scripts/generate_options.py
      ```
-
-3. **Dump JavaScript Files (Optional):**
-   - To combine and dump all JavaScript files into one file, use the [dump_js.py](http://_vscodecontentref_/0) script:
-     ```sh
-     python3 scripts/dump_js.py
-     ```
-     
-4. **Running the Website:**
-   - Open [index.html](http://_vscodecontentref_/1) in your browser or serve the files through your favorite web server.
-   - Use the “Add Column” button to add new columns. Start typing to search for folder paths and select from the suggestions.
-   - Play with the navigation and drag-and-drop interactions to explore how many images you can compare at once.
-   - Click the permalink button to generate and copy the URL with your current setup.
