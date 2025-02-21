@@ -3,7 +3,7 @@ import json
 import argparse
 
 
-def generate_options(create_level2=True):
+def generate_options(create_level2=True, level_2_depth=1):
     data_dir = 'data'
     level1_file = os.path.join(data_dir, 'level1-options.json')
     level2_file = os.path.join(data_dir, 'level2-options.json')
@@ -21,14 +21,14 @@ def generate_options(create_level2=True):
             rel_dir = os.path.relpath(dirpath, data_dir)
             parts = rel_dir.split(os.sep)
             if create_level2:
-                # The channel folder is the last directory.
-                channel_name = parts[-1]
-                # The level-1 folder is the path until (but not including) the channel folder.
-                if len(parts) >= 2:
-                    level1_key = os.path.join(*parts[:-1])
+                # Use the last `level2_depth` parts as the channel grouping.
+                if len(parts) > level_2_depth:
+                    level1_key = os.path.join(*parts[:-level_2_depth])
+                    channel_name = os.path.join(*parts[-level_2_depth:])
                 else:
+                    # Fallback if not enough parts exist.
                     level1_key = parts[0]
-                # Register the channel info under the corresponding level-1 key.
+                    channel_name = os.path.join(*parts)
                 if level1_key not in level2:
                     level2[level1_key] = []
                 level2[level1_key].append({"label": channel_name, "value": channel_name})
@@ -69,5 +69,6 @@ def generate_options(create_level2=True):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate options for asym_comparison project.")
     parser.add_argument("--no-level-2", action="store_true", help="Do not create level2-options.json")
+    parser.add_argument("--level-2-depth", type=int, default=1, help="Number of folder levels to use for level2 grouping")
     args = parser.parse_args()
-    generate_options(create_level2=not args.no_level_2)
+    generate_options(create_level2=not args.no_level_2, level_2_depth=args.level_2_depth)
