@@ -197,7 +197,7 @@ function createColumn(initialData) {
           let pngFiles = file_order.filter(obj => obj.png && obj.png.toLowerCase().endsWith('.png'));
           let loadPromises = pngFiles.map(obj => new Promise(resolve => {
             const img = new Image();
-            img.src = hasLevel2 ? // <-- MODIFY
+            img.src = hasLevel2 ?
               `data/${folder}/${channel}/${obj.png}` :
               `data/${folder}/${obj.png}`;
             img.onload = () => resolve({ file: obj.png, exists: true });
@@ -217,8 +217,8 @@ function createColumn(initialData) {
       updateDisplayedPicture();
     }
 
-    // Synchronize channel selection across all other columns.
-    if (hasLevel2 && !window._isSyncingChannel) {
+    // Synchronize channel selection across all other columns if the checkbox is checked.
+    if (hasLevel2 && document.getElementById('syncChannelsCheckbox')?.checked && !window._isSyncingChannel) {
       window._isSyncingChannel = true;
       activeColumns.forEach(otherCol => {
         if (otherCol === colData) return;

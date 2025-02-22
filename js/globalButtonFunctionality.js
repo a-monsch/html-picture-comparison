@@ -4,8 +4,21 @@ let hasLevel2 = true; // Global flag for level2 existence
 document.addEventListener('DOMContentLoaded', () => {
   // Check level2-options.json existence
     fetch('data/level2-options.json')
-      .then(r => { hasLevel2 = r.ok; })
-      .catch(() => { hasLevel2 = false; });
+      .then(r => { 
+        hasLevel2 = r.ok; 
+        // Show/hide sync checkbox based on level2 availability.
+        const syncCb = document.getElementById('syncChannelsCheckbox');
+        if (syncCb) {
+          syncCb.style.display = hasLevel2 ? 'inline-block' : 'none';
+        }
+      })
+      .catch(() => { 
+        hasLevel2 = false;
+        const syncCb = document.getElementById('syncChannelsCheckbox');
+        if (syncCb) {
+          syncCb.style.display = 'none';
+        }
+      });
     const urlParams = new URLSearchParams(window.location.search);
     const stateParam = urlParams.get('state');
     if (stateParam) {
