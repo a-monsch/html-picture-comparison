@@ -106,9 +106,20 @@ function createColumn(initialData) {
     setTimeout(() => { suggestionsContainer.innerHTML = ''; }, 150);
   });
 
-  // When search input changes (due to selection), update channel dropdown.
+  // When the search input changes (due to selection), update channel dropdown.
   searchInput.addEventListener('change', () => {
     const folder = searchInput.getAttribute('data-selected') || '';
+    // If folder path contains /log/ or /linear/ (with an optional trailing slash), show the global toggle dropdown and set its value.
+    const toggleDropdown = document.getElementById('togglePathDropdown');
+    if (toggleDropdown) {
+      if (/\/(log|linear)(\/|$)/.test(folder)) {
+        toggleDropdown.style.display = 'inline-block';
+        const matched = folder.match(/\/(log|linear)(\/|$)/);
+        if (matched) {
+          toggleDropdown.value = matched[1]; // Set to "log" or "linear"
+        }
+      }
+    }
     // Reset channel dropdown and image container.
     channelSelect.innerHTML = '';
     channelSelect.appendChild(new Option('Select Channel', ''));

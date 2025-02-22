@@ -54,6 +54,28 @@ document.addEventListener('DOMContentLoaded', () => {
     } while (unionFiles.length && !activeColumns.some(c => c.availableFiles.includes(unionFiles[currentPictureIndex].png)));
     updateDisplayedPicture();
     });
+
+    // Global toggle for folder path replacement.
+    const toggleDropdown = document.getElementById('togglePathDropdown');
+    if (toggleDropdown) {
+      toggleDropdown.addEventListener('change', (e) => {
+        const newVal = e.target.value; // either "log" or "linear"
+        activeColumns.forEach(colData => {
+          // Updated regex to match /log or /linear that may or may not end with a slash.
+          if (colData.folder && /\/(log|linear)(\/|$)/.test(colData.folder)) {
+            colData.folder = colData.folder.replace(/\/(log|linear)(\/|$)/, (match, p1, p2) => {
+              return '/' + newVal + (p2 === '/' ? '/' : '');
+            });
+            // Update the search input for visual feedback.
+            colData.searchInput.value = colData.folder;
+            colData.searchInput.setAttribute('data-selected', colData.folder);
+            // Re-trigger channel update.
+            colData.channelSelect.dispatchEvent(new Event('change'));
+          }
+        });
+        updateDisplayedPicture();
+      });
+    }
     
 });
 
