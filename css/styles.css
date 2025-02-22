@@ -140,3 +140,22 @@ h1 {
     background-color: #f00 !important;
     cursor: pointer !important;
 }
+
+/* Dark mode styles */
+body.dark-mode {
+    background-color: #404040;
+    color: #ddd;
+}
+body.dark-mode input,
+body.dark-mode select {
+    background-color: #555;
+    color: #eee;
+    border-color: #777;
+}
+body.dark-mode .column,
+body.dark-mode .col-wrapper {
+    border-color: #777;
+}
+body.dark-mode a {
+    color: #89CFF0;
+}
