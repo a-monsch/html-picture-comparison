@@ -22,7 +22,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const stateParam = urlParams.get('state');
     if (stateParam) {
-      const columnsData = stateParam.split('|').map(colState => {
+      // If state contains a global part (using ";" as delimiter), split it.
+      let globalState = { sync: 'true', toggle: 'linear' };
+      let columnsPart = stateParam;
+      if (stateParam.includes(';')) {
+        const parts = stateParam.split(';');
+        const globalPart = parts.shift();
+        columnsPart = parts.join(';'); // remaining is columns state
+        globalPart.split(',').forEach(pair => {
+          const [k, v] = pair.split(':');
+          globalState[k] = v;
+        });
+      }
+      // Set global sync checkbox.
+      const syncCb = document.getElementById('syncChannelsCheckbox');
+      if (syncCb) {
+        syncCb.checked = (globalState.sync === 'true');
+      }
+      // Set toggle dropdown value (show it if a folder indicating log/linear is present).
+      const toggleDropdown = document.getElementById('togglePathDropdown');
+      if (toggleDropdown) {
+        toggleDropdown.style.display = 'inline-block';
+        toggleDropdown.value = globalState.toggle || 'linear';
+      }
+      // For older links without a global part, columnsPart will be the full state.
+      const columnsData = columnsPart.split('|').map(colState => {
         const [title, folder, channel] = colState.split(',').map(s => decodeURIComponent(s));
         return { title, folder, channel };
       });
@@ -81,12 +105,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Permalink button click handler
 document.getElementById('permalinkBtn').addEventListener('click', () => {
-  const state = activeColumns.map(col => {
-    const title = col.title || 'Column Title';
-    const folder = col.folder || '';
-    const channel = col.channel || '';
-    return encodeURIComponent(title) + ',' + encodeURIComponent(folder) + ',' + encodeURIComponent(channel);
-  }).join('|');
+  // Get global sync state.
+  const syncCb = document.getElementById('syncChannelsCheckbox');
+  const sync = syncCb ? (syncCb.checked ? 'true' : 'false') : 'true';
+  // Get global toggle dropdown value; default to "linear" if not visible.
+  const toggleDropdown = document.getElementById('togglePathDropdown');
+  let toggleVal = 'linear';
+  if (toggleDropdown && toggleDropdown.style.display !== 'none') {
+    toggleVal = toggleDropdown.value;
+  }
+  // Get the column order from the DOM (#columns children order).
+  const colWrappers = document.querySelectorAll('#columns .col-wrapper');
+  const colStateArray = [];
+  colWrappers.forEach(wrapper => {
+    // Retrieve corresponding column state from activeColumns using the syncId.
+    const syncId = wrapper.dataset.syncId;
+    const colData = activeColumns.find(x => x.col.parentNode === wrapper || x.col.dataset.syncId === syncId);
+    if (colData) {
+      const title = colData.title || 'Column Title';
+      const folder = colData.folder || '';
+      const channel = colData.channel || '';
+      colStateArray.push(encodeURIComponent(title) + ',' + encodeURIComponent(folder) + ',' + encodeURIComponent(channel));
+    }
+  });
+  // Global state stored as "sync:true,toggle:linear"
+  const globalState = `sync:${sync},toggle:${toggleVal}`;
+  // Columns state with the order as in the DOM.
+  const columnsState = colStateArray.join('|');
+  const state = globalState + ';' + columnsState;
   const url = new URL(window.location);
   url.searchParams.set('state', state);
   navigator.clipboard.writeText(url.href).then(() => {
