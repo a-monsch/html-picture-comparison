@@ -104,12 +104,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const darkModeToggle = document.getElementById('darkModeToggle');
     if (darkModeToggle) {
       darkModeToggle.addEventListener('click', () => {
+        // Toggle the dark-mode class.
         document.body.classList.toggle('dark-mode');
-        if(document.body.classList.contains('dark-mode')){
+
+        // Update the toggle button icon.
+        if (document.body.classList.contains('dark-mode')) {
           darkModeToggle.textContent = '🌙';
         } else {
           darkModeToggle.textContent = '☀';
         }
+
+        // Immediately update all displayed PNG images.
+        // For each image in a column wrapper, swap its src with the stored original/inverted version.
+        document.querySelectorAll('.col-wrapper img').forEach(img => {
+          if (img.dataset.original && img.dataset.inverted) {
+            if (document.body.classList.contains('dark-mode')) {
+              // If dark mode is on, show the inverted version.
+              img.src = img.dataset.inverted;
+            } else {
+              // Otherwise, restore the original.
+              img.src = img.dataset.original;
+            }
+          }
+        });
+
+        // Update the background color and text color of placeholders.
+        document.querySelectorAll('.no-image-placeholder').forEach(placeholder => {
+          placeholder.style.backgroundColor = document.body.classList.contains('dark-mode') ? '#000' : '#eee';
+          placeholder.style.color = document.body.classList.contains('dark-mode') ? '#fff' : '';
+        });
       });
     }
     

@@ -140,6 +140,7 @@ function createColumn(initialData) {
   // Delete Column button (absolutely positioned inside .column)
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = '✖';
+  deleteBtn.className = 'deleteBtn';
   deleteBtn.style.position = 'absolute';
   deleteBtn.style.top = '2px';
   deleteBtn.style.right = '0%';
