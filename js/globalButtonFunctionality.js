@@ -1,34 +1,107 @@
 // Global next and previous button functionality.
 let hasLevel2 = true; // Global flag for level2 existence
 
+// --- Begin Mapping Functions for Permalink Shortening ---
+function shortenPath(path) {
+  if (window.folderMapping && window.folderMapping.folderToHash && window.folderMapping.folderToHash[path]) {
+    return window.folderMapping.folderToHash[path];
+  }
+  // Fallback: use last segment.
+  const parts = path.split('/');
+  return parts[parts.length - 1];
+}
+
+function expandPath(hash) {
+  if (window.folderMapping && window.folderMapping.hashToFolder && window.folderMapping.hashToFolder[hash]) {
+    return window.folderMapping.hashToFolder[hash];
+  }
+  return hash;
+}
+
+function shortenState(state) {
+  // Given state as "globalState;columnsState" shorten folder part in each column.
+  let parts = state.split(';');
+  if (parts.length < 2) return state;
+  let globalPart = parts[0];
+  let columnsPart = parts.slice(1).join(';');
+  const shortenedColumns = columnsPart.split('|').map(col => {
+    // Expected column state: title,folder,channel
+    let tokens = col.split(',');
+    if (tokens.length > 1) {
+      tokens[1] = encodeURIComponent(shortenPath(decodeURIComponent(tokens[1])));
+    }
+    return tokens.join(',');
+  }).join('|');
+  return globalPart + ';s:' + shortenedColumns;
+}
+
+function expandState(state) {
+  // If the columns part has been shortened (marker "s:"), expand the folder values.
+  let parts = state.split(';');
+  if (parts.length < 2) return state;
+  let globalPart = parts[0];
+  let columnsPart = parts.slice(1).join(';');
+  if (columnsPart.startsWith('s:')) {
+    columnsPart = columnsPart.substring(2);
+    const expandedColumns = columnsPart.split('|').map(col => {
+      let tokens = col.split(',');
+      if (tokens.length > 1) {
+        tokens[1] = encodeURIComponent(expandPath(decodeURIComponent(tokens[1])));
+      }
+      return tokens.join(',');
+    }).join('|');
+    return globalPart + ';' + expandedColumns;
+  }
+  return state;
+}
+// --- End Mapping Functions ---
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Check level2-options.json existence
-    fetch('data/level2-options.json')
-      .then(r => { 
-        hasLevel2 = r.ok; 
-        // Show/hide sync checkbox based on level2 availability.
-        const syncCb = document.getElementById('syncChannelsCheckbox');
-        if (syncCb) {
-          syncCb.style.display = hasLevel2 ? 'inline-block' : 'none';
-        }
-      })
-      .catch(() => { 
-        hasLevel2 = false;
-        const syncCb = document.getElementById('syncChannelsCheckbox');
-        if (syncCb) {
-          syncCb.style.display = 'none';
-        }
+  // Check level2-options.json existence (unchanged)
+  fetch('data/level2-options.json')
+    .then(r => { 
+      hasLevel2 = r.ok; 
+      const syncCb = document.getElementById('syncChannelsCheckbox');
+      if (syncCb) {
+        syncCb.style.display = hasLevel2 ? 'inline-block' : 'none';
+      }
+    })
+    .catch(() => { 
+      hasLevel2 = false;
+      const syncCb = document.getElementById('syncChannelsCheckbox');
+      if (syncCb) {
+        syncCb.style.display = 'none';
+      }
+    });
+
+  // Load folder mapping from level1-options.json and create a deterministic mapping.
+  window.folderMapping = { folderToHash: {}, hashToFolder: {} };
+  fetch('data/level1-options.json')
+    .then(response => response.json())
+    .then(data => {
+      let sorted = data.slice().sort();
+      sorted.forEach((folder, index) => {
+        let hash = (index + 1).toString().padStart(5, '0'); // 5-character hash
+        window.folderMapping.folderToHash[folder] = hash;
+        window.folderMapping.hashToFolder[hash] = folder;
       });
+      processStateParam();
+    })
+    .catch(() => {
+      processStateParam();
+    });
+
+  function processStateParam() {
     const urlParams = new URLSearchParams(window.location.search);
-    const stateParam = urlParams.get('state');
+    let stateParam = urlParams.get('state');
     if (stateParam) {
-      // If state contains a global part (using ";" as delimiter), split it.
+      stateParam = expandState(stateParam);
       let globalState = { sync: 'true', toggle: 'linear' };
       let columnsPart = stateParam;
       if (stateParam.includes(';')) {
         const parts = stateParam.split(';');
         const globalPart = parts.shift();
-        columnsPart = parts.join(';'); // remaining is columns state
+        columnsPart = parts.join(';');
         globalPart.split(',').forEach(pair => {
           const [k, v] = pair.split(':');
           globalState[k] = v;
@@ -37,18 +110,15 @@ document.addEventListener('DOMContentLoaded', () => {
           currentPictureIndex = parseInt(globalState.pic);
         }
       }
-      // Set global sync checkbox.
       const syncCb = document.getElementById('syncChannelsCheckbox');
       if (syncCb) {
         syncCb.checked = (globalState.sync === 'true');
       }
-      // Set toggle dropdown value (show it if a folder indicating log/linear is present).
       const toggleDropdown = document.getElementById('togglePathDropdown');
       if (toggleDropdown) {
         toggleDropdown.style.display = 'inline-block';
         toggleDropdown.value = globalState.toggle || 'linear';
       }
-      // For older links without a global part, columnsPart will be the full state.
       const columnsData = columnsPart.split('|').map(colState => {
         const [title, folder, channel] = colState.split(',').map(s => decodeURIComponent(s));
         return { title, folder, channel };
@@ -58,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       addColumn();
       addColumn();
     }
-    
+  }
     
     document.getElementById('globalAddBtn').addEventListener('click', addColumn);
 
@@ -170,7 +240,9 @@ document.getElementById('permalinkBtn').addEventListener('click', () => {
   const globalState = `sync:${sync},toggle:${toggleVal},pic:${currentPictureIndex}`;
   // Columns state with the order as in the DOM.
   const columnsState = colStateArray.join('|');
-  const state = globalState + ';' + columnsState;
+  const fullState = globalState + ';' + columnsState;
+  // Apply shortening to new state
+  const state = shortenState(fullState);
   const url = new URL(window.location);
   url.searchParams.set('state', state);
   navigator.clipboard.writeText(url.href).then(() => {
