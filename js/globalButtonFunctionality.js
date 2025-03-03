@@ -33,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
           const [k, v] = pair.split(':');
           globalState[k] = v;
         });
+        if (globalState.pic) {
+          currentPictureIndex = parseInt(globalState.pic);
+        }
       }
       // Set global sync checkbox.
       const syncCb = document.getElementById('syncChannelsCheckbox');
@@ -164,7 +167,7 @@ document.getElementById('permalinkBtn').addEventListener('click', () => {
     }
   });
   // Global state stored as "sync:true,toggle:linear"
-  const globalState = `sync:${sync},toggle:${toggleVal}`;
+  const globalState = `sync:${sync},toggle:${toggleVal},pic:${currentPictureIndex}`;
   // Columns state with the order as in the DOM.
   const columnsState = colStateArray.join('|');
   const state = globalState + ';' + columnsState;
