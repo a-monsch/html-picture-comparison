@@ -61,83 +61,82 @@ export function handleDropdownChange(event) {
 
     if (state && id && !isNaN(index)) {
         const oldSelections = [...state.dropdownSelections];
+        // --- Store old sync state BEFORE potentially modifying it ---
+        const oldSyncDisabled = state.syncDisabled ? { ...state.syncDisabled } : {}; // Shallow copy is sufficient
+
         const pathInput = col.querySelector('.pathInput');
         const basePathString = pathInput?.value || '';
         let finalSelections = [];
 
-        // --- New Logic: Check if subsequent selections can be preserved ---
+        // --- Check if subsequent selections can be preserved ---
         let preserveSubsequent = false;
-        if (value) { // Only try to preserve if the new selection is not empty ("-- Select --")
-            // Construct the potential full path with the new selection and old subsequent ones
+        if (value) {
             let potentialNewSelections = oldSelections.slice(0, index);
             potentialNewSelections[index] = value;
-            // Append the *original* selections *after* the changed index
             if (oldSelections.length > index + 1) {
                  potentialNewSelections = potentialNewSelections.concat(oldSelections.slice(index + 1));
             }
-             console.log(`[handleDropdownChange ${id}] Checking potential path:`, basePathString, potentialNewSelections);
-
-            // Validate this potential path
+             // console.log(`[handleDropdownChange ${id}] Checking potential path:`, basePathString, potentialNewSelections);
             if (isValidPath(basePathString, potentialNewSelections)) {
                 preserveSubsequent = true;
                 finalSelections = potentialNewSelections;
-                 console.log(`[handleDropdownChange ${id}] Path valid. Preserving subsequent selections.`);
+                 // console.log(`[handleDropdownChange ${id}] Path valid. Preserving subsequent selections.`);
             } else {
-                 console.log(`[handleDropdownChange ${id}] Path invalid. Resetting subsequent selections.`);
+                 // console.log(`[handleDropdownChange ${id}] Path invalid. Resetting subsequent selections.`);
             }
         } else {
-             console.log(`[handleDropdownChange ${id}] Empty selection. Resetting subsequent selections.`);
+             // console.log(`[handleDropdownChange ${id}] Empty selection. Resetting subsequent selections.`);
         }
 
         // --- Apply Reset Logic if Preservation Failed ---
         if (!preserveSubsequent) {
-            // Current reset behavior: slice up to the changed index, add the new value if any.
             finalSelections = oldSelections.slice(0, index);
             if (value) {
                 finalSelections[index] = value;
             }
-            // No need to explicitly set length, slicing handles it.
         }
-        // --- End New Logic ---
 
-
+        // --- Update State Selections ---
         state.dropdownSelections = finalSelections;
-        state.currentIndex = -1; // Reset image index whenever dropdowns change
+        state.currentIndex = -1; // Reset image index
 
-        // Clear sync disabled flags for levels *after* the changed one,
-        // regardless of preservation, as the path *did* change.
-        // If subsequent selections were reset, their sync status is irrelevant anyway.
-        // If they were preserved, their sync status *should* still be reset conceptually,
-        // as the user made an explicit choice higher up that might invalidate sync assumptions.
-        if (state.syncDisabled) {
-            Object.keys(state.syncDisabled).forEach(key => {
-                if (parseInt(key) > index) {
-                    delete state.syncDisabled[key];
-                }
-            });
+        // --- Conditionally Reset Sync Disabled Flags ---
+        // *Only* reset sync flags for subsequent levels if we are *NOT* preserving them.
+        if (!preserveSubsequent) {
+            // console.log(`[handleDropdownChange ${id}] Resetting subsequent syncDisabled flags.`);
+            if (state.syncDisabled) {
+                Object.keys(state.syncDisabled).forEach(key => {
+                    const keyIndex = parseInt(key);
+                    // Check if the key represents an index *after* the one changed
+                    if (!isNaN(keyIndex) && keyIndex > index) {
+                        delete state.syncDisabled[key]; // Remove the disabled flag (enables sync)
+                    }
+                });
+            }
+        } else {
+             // console.log(`[handleDropdownChange ${id}] Preserving subsequent syncDisabled flags.`);
+             // If preserving, we don't touch state.syncDisabled here.
+             // updateDropdownsUI will read the existing preserved flags.
         }
+        // --- End Conditional Reset ---
 
 
         // --- Update UI and Sync/Recalculate (remains the same) ---
-        // Update dropdowns first (this also calls updateImageUI)
         if (typeof updateDropdownsUI === 'function') {
-             updateDropdownsUI(id);
+             updateDropdownsUI(id); // This will now use the potentially preserved syncDisabled state
         } else {
             console.error("[handleDropdownChange] updateDropdownsUI function is not available.");
         }
 
-        // Sync other columns if needed (using the *final* value at the changed level)
         const syncCb = col.querySelector(`.syncCheckbox[data-level-index="${index}"]`);
         if (syncCb && syncCb.checked) {
             if (typeof syncDropdowns === 'function') {
-                // Pass the actual selected value (or "" if reset)
                 syncDropdowns(id, index, value);
             } else {
                 console.error("[handleDropdownChange] syncDropdowns function not available.");
             }
         }
 
-        // THEN Recalculate master image list based on the potentially changed folder content
         if (typeof recalculateCombinedImageList === 'function') {
              recalculateCombinedImageList();
         } else {
