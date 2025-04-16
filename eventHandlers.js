@@ -1,14 +1,14 @@
 import { fileStructure } from './fileStructure.js';
 // Import state functions used in this module
-import { getColumnState, getColumnElement, updateColumnOrderState, updatePermalink, addColumnToState, removeColumnFromState } from './state.js';
+import { columnsState, getColumnState, getColumnElement, updateColumnOrderState, updatePermalink, addColumnToState, removeColumnFromState } from './state.js'; // Keep columnsState
 // Import ALL domUtils functions used in this module
 import {
     updateDropdownsUI, hideSearchPreview, updateSearchResultsPreview,
     setDraggingStyle, clearDragOverStyles, setDragOverStyle, getDragAfterElement,
-    syncDropdownContainerHeights, updateImageUI // Added updateImageUI just in case
+    syncDropdownContainerHeights, updateImageUI // Keep updateImageUI import (needed elsewhere)
 } from './domUtils.js';
-// Import NEW logic functions
-import { syncDropdowns, findMatchingPaths, recalculateCombinedImageList, navigateGlobalImageIndex } from './logic.js';
+// Import logic functions
+import { findMatchingPaths, recalculateCombinedImageList, navigateGlobalImageIndex } from './logic.js'; // Removed syncDropdowns
 // Import helper functions used
 import { debounce, parsePath, getNested, isValidPath } from './helpers.js';
 
@@ -55,40 +55,40 @@ export function handlePathInputBlur(event) {
 }
 
 export function handleDropdownChange(event) {
-    if (event.target.tagName !== 'SELECT') return;
-    const select = event.target; const col = select.closest('.column'); const id = col?.dataset.id; const state = getColumnState(id);
-    const index = parseInt(select.dataset.levelIndex); const value = select.value; // The newly selected value at this index
+    const select = event.target;
+    if (select.tagName !== 'SELECT') return;
 
-    if (state && id && !isNaN(index)) {
-        const oldSelections = [...state.dropdownSelections];
-        // --- Store old sync state BEFORE potentially modifying it ---
-        const oldSyncDisabled = state.syncDisabled ? { ...state.syncDisabled } : {}; // Shallow copy is sufficient
+    const col = select.closest('.column');
+    const currentColumnId = col?.dataset.id;
+    const state = getColumnState(currentColumnId);
+    const index = parseInt(select.dataset.levelIndex);
+    const value = select.value;
 
+    if (!state || !currentColumnId || isNaN(index)) return;
+
+    // --- Guard against programmatic sync loops ---
+    if (event.isProgrammaticSync) {
+        // console.log(`[handleDropdownChange ${currentColumnId}] Processing programmatic sync for level ${index}`);
+        // This block handles updates *within* the column that received the sync event
+
+        const oldSelections = [...state.dropdownSelections]; // Use current selections of the target
         const pathInput = col.querySelector('.pathInput');
         const basePathString = pathInput?.value || '';
         let finalSelections = [];
-
-        // --- Check if subsequent selections can be preserved ---
         let preserveSubsequent = false;
-        if (value) {
+
+        if (value) { // Value here is the one received from the sync source
             let potentialNewSelections = oldSelections.slice(0, index);
             potentialNewSelections[index] = value;
             if (oldSelections.length > index + 1) {
                  potentialNewSelections = potentialNewSelections.concat(oldSelections.slice(index + 1));
             }
-             // console.log(`[handleDropdownChange ${id}] Checking potential path:`, basePathString, potentialNewSelections);
             if (isValidPath(basePathString, potentialNewSelections)) {
                 preserveSubsequent = true;
                 finalSelections = potentialNewSelections;
-                 // console.log(`[handleDropdownChange ${id}] Path valid. Preserving subsequent selections.`);
-            } else {
-                 // console.log(`[handleDropdownChange ${id}] Path invalid. Resetting subsequent selections.`);
             }
-        } else {
-             // console.log(`[handleDropdownChange ${id}] Empty selection. Resetting subsequent selections.`);
         }
 
-        // --- Apply Reset Logic if Preservation Failed ---
         if (!preserveSubsequent) {
             finalSelections = oldSelections.slice(0, index);
             if (value) {
@@ -96,55 +96,121 @@ export function handleDropdownChange(event) {
             }
         }
 
-        // --- Update State Selections ---
         state.dropdownSelections = finalSelections;
         state.currentIndex = -1; // Reset image index
 
-        // --- Conditionally Reset Sync Disabled Flags ---
-        // *Only* reset sync flags for subsequent levels if we are *NOT* preserving them.
+        // Reset sync flags ONLY if subsequent selections were NOT preserved
         if (!preserveSubsequent) {
-            // console.log(`[handleDropdownChange ${id}] Resetting subsequent syncDisabled flags.`);
             if (state.syncDisabled) {
                 Object.keys(state.syncDisabled).forEach(key => {
                     const keyIndex = parseInt(key);
-                    // Check if the key represents an index *after* the one changed
                     if (!isNaN(keyIndex) && keyIndex > index) {
-                        delete state.syncDisabled[key]; // Remove the disabled flag (enables sync)
+                        delete state.syncDisabled[key];
                     }
                 });
             }
-        } else {
-             // console.log(`[handleDropdownChange ${id}] Preserving subsequent syncDisabled flags.`);
-             // If preserving, we don't touch state.syncDisabled here.
-             // updateDropdownsUI will read the existing preserved flags.
         }
-        // --- End Conditional Reset ---
 
-
-        // --- Update UI and Sync/Recalculate (remains the same) ---
+        // Update this (target) column's dropdown structure
         if (typeof updateDropdownsUI === 'function') {
-             updateDropdownsUI(id); // This will now use the potentially preserved syncDisabled state
+             updateDropdownsUI(currentColumnId);
         } else {
             console.error("[handleDropdownChange] updateDropdownsUI function is not available.");
         }
 
-        const syncCb = col.querySelector(`.syncCheckbox[data-level-index="${index}"]`);
-        if (syncCb && syncCb.checked) {
-            if (typeof syncDropdowns === 'function') {
-                syncDropdowns(id, index, value);
-            } else {
-                console.error("[handleDropdownChange] syncDropdowns function not available.");
+        // DO NOT trigger recalculate/permalink here; let the original event handler do it once.
+        return; // End processing for programmatic event
+    }
+
+    // --- Regular User Event Processing ---
+    // console.log(`[handleDropdownChange ${currentColumnId}] Processing user change for level ${index} to "${value}"`);
+
+    // --- 1. Update State for the Source Column ---
+    const oldSelections = [...state.dropdownSelections];
+    const pathInput = col.querySelector('.pathInput');
+    const basePathString = pathInput?.value || '';
+    let finalSelections = [];
+    let preserveSubsequent = false;
+
+    if (value) {
+        let potentialNewSelections = oldSelections.slice(0, index);
+        potentialNewSelections[index] = value;
+        if (oldSelections.length > index + 1) {
+             potentialNewSelections = potentialNewSelections.concat(oldSelections.slice(index + 1));
+        }
+        if (isValidPath(basePathString, potentialNewSelections)) {
+            preserveSubsequent = true;
+            finalSelections = potentialNewSelections;
+        }
+    }
+
+    if (!preserveSubsequent) {
+        finalSelections = oldSelections.slice(0, index);
+        if (value) {
+            finalSelections[index] = value;
+        }
+    }
+
+    state.dropdownSelections = finalSelections;
+    state.currentIndex = -1;
+
+    if (!preserveSubsequent) {
+        if (state.syncDisabled) {
+            Object.keys(state.syncDisabled).forEach(key => {
+                const keyIndex = parseInt(key);
+                if (!isNaN(keyIndex) && keyIndex > index) {
+                    delete state.syncDisabled[key];
+                }
+            });
+        }
+    }
+
+    // --- 2. Trigger Synchronization in OTHER columns (if user event) ---
+    console.log(`[handleDropdownChange ${currentColumnId}] Initiating sync check for level ${index} value "${value}"`);
+    columnsState.forEach(targetState => {
+        if (targetState.id === currentColumnId) return; // Skip self
+
+        const isSyncEnabled = !(targetState.syncDisabled?.[index] ?? false);
+        if (isSyncEnabled) {
+            const targetElement = getColumnElement(targetState.id);
+            if (!targetElement) return;
+            const targetSelect = targetElement.querySelector(`select[data-level-index="${index}"]`);
+
+            if (targetSelect) {
+                const optionExists = targetSelect.querySelector(`option[value="${value}"]`);
+                const valueChanged = targetSelect.value !== value;
+
+                if (optionExists && valueChanged) {
+                     console.log(`[handleDropdownChange ${currentColumnId}] --> Syncing Column ${targetState.id} @ level ${index} to "${value}"`);
+                    targetSelect.value = value;
+                    const syncEvent = new Event('change', { bubbles: true });
+                    syncEvent.isProgrammaticSync = true;
+                    targetSelect.dispatchEvent(syncEvent);
+                }
             }
         }
+    });
 
-        if (typeof recalculateCombinedImageList === 'function') {
-             recalculateCombinedImageList();
-        } else {
-            console.error("[handleDropdownChange] recalculateCombinedImageList function not available.");
-        }
-
-        updatePermalink();
+    // --- 3. Update Source Column Dropdown UI ---
+    // Needs to happen after sync dispatch, so target event handlers can process based on old source UI if needed
+    // Needs to happen before recalculate, so recalculate sees the final UI state (though state matters more)
+    if (typeof updateDropdownsUI === 'function') {
+        updateDropdownsUI(currentColumnId);
+    } else {
+        console.error("[handleDropdownChange] updateDropdownsUI function is not available.");
     }
+
+    // --- 4. Recalculate Global Image List & Update ALL Image Displays ---
+    // This should run ONCE after all state changes (source + targets) have settled.
+    if (typeof recalculateCombinedImageList === 'function') {
+         console.log(`[handleDropdownChange ${currentColumnId}] Triggering global recalculation.`);
+         recalculateCombinedImageList();
+    } else {
+        console.error("[handleDropdownChange] recalculateCombinedImageList function not available.");
+    }
+
+    // --- 5. Update Permalink ---
+    updatePermalink();
 }
 
 export function handleSyncCheckboxChange(event) {

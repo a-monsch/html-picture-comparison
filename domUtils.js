@@ -70,7 +70,7 @@ export function syncDropdownContainerHeights() {
 
 // --- Update Dropdowns UI (Calls Sync) ---
 export function updateDropdownsUI(columnId) {
-    // console.log(`[updateDropdownsUI ${columnId}] Starting update.`); // Reduce noise
+    // console.log(`[updateDropdownsUI ${columnId}] Starting update.`);
     const columnState = getColumnState(columnId); const columnElement = getColumnElement(columnId);
     if (!columnState || !columnElement || typeof fileStructure === 'undefined') return;
     const pathInput = columnElement.querySelector('.pathInput'); const dropdownContainer = columnElement.querySelector('.dropdownContainer');
@@ -80,30 +80,29 @@ export function updateDropdownsUI(columnId) {
     try {
         // --- Process base path segments ---
         for (let i = 0; i < basePathSegments.length; i++) {
+            // ... (inner loop logic remains the same) ...
             const segment = basePathSegments[i];
             if (!currentLevelObj || typeof currentLevelObj !== 'object') { currentLevelObj = null; break; }
-
             if (segment === '*') {
-                const subdirs = Object.keys(currentLevelObj).filter(key => typeof currentLevelObj[key] === 'object' && !key.endsWith('.png') && !key.endsWith('.pdf'));
-                if (subdirs.length === 0) { currentLevelObj = null; break; }
-
-                const levelDiv = document.createElement('div'); levelDiv.className = 'dropdownLevel'; levelDiv.dataset.levelIndex = String(dropdownLevelIndex);
-                const select = document.createElement('select'); select.dataset.levelIndex = String(dropdownLevelIndex); select.innerHTML = '<option value="">-- Select --</option>';
-                subdirs.sort().forEach(dir => { const option = document.createElement('option'); option.value = dir; option.textContent = dir; select.appendChild(option); });
-                const syncCheckbox = document.createElement('input'); syncCheckbox.type = 'checkbox'; syncCheckbox.className = 'syncCheckbox'; syncCheckbox.title = 'Sync this level'; syncCheckbox.dataset.levelIndex = String(dropdownLevelIndex);
-                syncCheckbox.checked = !(columnState.syncDisabled?.[dropdownLevelIndex] ?? false);
-                levelDiv.appendChild(select); levelDiv.appendChild(syncCheckbox); dropdownContainer.appendChild(levelDiv);
-
-                const savedSelection = columnState.dropdownSelections[dropdownLevelIndex];
-                let nextLevelObj = null;
-                if (savedSelection && subdirs.includes(savedSelection)) {
-                    select.value = savedSelection;
-                    nextLevelObj = (currentLevelObj && typeof currentLevelObj === 'object') ? currentLevelObj[savedSelection] : null;
-                }
-                currentLevelObj = nextLevelObj;
-                dropdownLevelIndex++;
-                if (!select.value) { currentLevelObj = null; break; }
-
+                // ... (dropdown creation logic remains the same) ...
+                 const subdirs = Object.keys(currentLevelObj).filter(key => typeof currentLevelObj[key] === 'object' && !key.endsWith('.png') && !key.endsWith('.pdf'));
+                 if (subdirs.length === 0) { currentLevelObj = null; break; }
+                 const levelDiv = document.createElement('div'); levelDiv.className = 'dropdownLevel'; levelDiv.dataset.levelIndex = String(dropdownLevelIndex);
+                 const select = document.createElement('select'); select.dataset.levelIndex = String(dropdownLevelIndex); select.innerHTML = '<option value="">-- Select --</option>';
+                 subdirs.sort().forEach(dir => { const option = document.createElement('option'); option.value = dir; option.textContent = dir; select.appendChild(option); });
+                 const syncCheckbox = document.createElement('input'); syncCheckbox.type = 'checkbox'; syncCheckbox.className = 'syncCheckbox'; syncCheckbox.title = 'Sync this level'; syncCheckbox.dataset.levelIndex = String(dropdownLevelIndex);
+                 // Use the current state to set checked status
+                 syncCheckbox.checked = !(columnState.syncDisabled?.[dropdownLevelIndex] ?? false);
+                 levelDiv.appendChild(select); levelDiv.appendChild(syncCheckbox); dropdownContainer.appendChild(levelDiv);
+                 const savedSelection = columnState.dropdownSelections[dropdownLevelIndex];
+                 let nextLevelObj = null;
+                 if (savedSelection && subdirs.includes(savedSelection)) {
+                     select.value = savedSelection;
+                     nextLevelObj = (currentLevelObj && typeof currentLevelObj === 'object') ? currentLevelObj[savedSelection] : null;
+                 }
+                 currentLevelObj = nextLevelObj;
+                 dropdownLevelIndex++;
+                 if (!select.value) { currentLevelObj = null; break; }
             } else {
                 if (currentLevelObj.hasOwnProperty(segment) && typeof currentLevelObj[segment] === 'object') {
                     currentLevelObj = currentLevelObj[segment];
@@ -113,16 +112,16 @@ export function updateDropdownsUI(columnId) {
 
         // --- Process subsequent levels ---
         while (currentLevelObj && typeof currentLevelObj === 'object') {
+            // ... (subsequent dropdown creation logic remains the same) ...
             const subdirs = Object.keys(currentLevelObj).filter(key => typeof currentLevelObj[key] === 'object' && !key.endsWith('.png') && !key.endsWith('.pdf'));
             if (subdirs.length === 0) { break; }
-
             const levelDiv = document.createElement('div'); levelDiv.className = 'dropdownLevel'; levelDiv.dataset.levelIndex = String(dropdownLevelIndex);
             const select = document.createElement('select'); select.dataset.levelIndex = String(dropdownLevelIndex); select.innerHTML = '<option value="">-- Select --</option>';
             subdirs.sort().forEach(dir => { const option = document.createElement('option'); option.value = dir; option.textContent = dir; select.appendChild(option); });
             const syncCheckbox = document.createElement('input'); syncCheckbox.type = 'checkbox'; syncCheckbox.className = 'syncCheckbox'; syncCheckbox.title = 'Sync this level'; syncCheckbox.dataset.levelIndex = String(dropdownLevelIndex);
+            // Use the current state to set checked status
             syncCheckbox.checked = !(columnState.syncDisabled?.[dropdownLevelIndex] ?? false);
             levelDiv.appendChild(select); levelDiv.appendChild(syncCheckbox); dropdownContainer.appendChild(levelDiv);
-
             const savedSelection = columnState.dropdownSelections[dropdownLevelIndex];
             let nextLevelObj = null;
             if (savedSelection && subdirs.includes(savedSelection)) {
@@ -136,10 +135,13 @@ export function updateDropdownsUI(columnId) {
 
     } catch (error) { console.error(`[updateDropdownsUI ${columnId}] ERROR:`, error); dropdownContainer.innerHTML = '<p style="color: red;">Error.</p>'; }
     finally {
-        try { if (typeof syncDropdownContainerHeights === 'function') syncDropdownContainerHeights(); } catch (e) {}
-        // Call updateImageUI AFTER dropdowns are built/synced
-        if (typeof updateImageUI === 'function') updateImageUI(columnId);
-        else console.error("updateImageUI function not available in updateDropdownsUI");
+        // Sync heights AFTER building dropdowns
+        try { if (typeof syncDropdownContainerHeights === 'function') syncDropdownContainerHeights(); } catch (e) { console.warn("Error syncing dropdown heights", e); }
+
+        // --- REMOVED image update from here ---
+        // rely on recalculateCombinedImageList -> updateAllColumnsDisplay -> updateImageUI
+        // if (typeof updateImageUI === 'function') updateImageUI(columnId); // <<< REMOVED
+        // else console.error("updateImageUI function not available in updateDropdownsUI"); // <<< REMOVED
     }
 }
 
