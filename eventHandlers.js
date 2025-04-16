@@ -10,7 +10,7 @@ import {
 // Import NEW logic functions
 import { syncDropdowns, findMatchingPaths, recalculateCombinedImageList, navigateGlobalImageIndex } from './logic.js';
 // Import helper functions used
-import { debounce, parsePath, getNested } from './helpers.js';
+import { debounce, parsePath, getNested, isValidPath } from './helpers.js';
 
 let draggedColumnElement = null;
 const debouncedSearch = debounce((columnId, query) => {
@@ -57,30 +57,92 @@ export function handlePathInputBlur(event) {
 export function handleDropdownChange(event) {
     if (event.target.tagName !== 'SELECT') return;
     const select = event.target; const col = select.closest('.column'); const id = col?.dataset.id; const state = getColumnState(id);
-    const index = parseInt(select.dataset.levelIndex); const value = select.value;
+    const index = parseInt(select.dataset.levelIndex); const value = select.value; // The newly selected value at this index
 
     if (state && id && !isNaN(index)) {
-        const oldSelections = [...state.dropdownSelections]; let newSelections = oldSelections.slice(0, index); let nextObj = null;
-        try { // Simplified state update (no preservation attempt)
-            if (value) { newSelections[index] = value; }
-            // Ensure array length reflects current selection level
-            newSelections.length = value ? index + 1 : index;
-        } catch (e) { console.error(`[handleDropdownChange ${id}] Error building selections:`, e); newSelections = oldSelections; /* Revert on error? */ }
+        const oldSelections = [...state.dropdownSelections];
+        const pathInput = col.querySelector('.pathInput');
+        const basePathString = pathInput?.value || '';
+        let finalSelections = [];
 
-        state.dropdownSelections = newSelections; state.currentIndex = -1; // Reset index
-        Object.keys(state.syncDisabled || {}).forEach(key => { if (parseInt(key) > index) delete state.syncDisabled[key]; });
+        // --- New Logic: Check if subsequent selections can be preserved ---
+        let preserveSubsequent = false;
+        if (value) { // Only try to preserve if the new selection is not empty ("-- Select --")
+            // Construct the potential full path with the new selection and old subsequent ones
+            let potentialNewSelections = oldSelections.slice(0, index);
+            potentialNewSelections[index] = value;
+            // Append the *original* selections *after* the changed index
+            if (oldSelections.length > index + 1) {
+                 potentialNewSelections = potentialNewSelections.concat(oldSelections.slice(index + 1));
+            }
+             console.log(`[handleDropdownChange ${id}] Checking potential path:`, basePathString, potentialNewSelections);
 
-        // Update dropdowns first
-        if (typeof updateDropdownsUI === 'function') { updateDropdownsUI(id); } // Calls syncHeight and updateImageUI
-        else { console.error("updateDropdownsUI function is not available."); }
+            // Validate this potential path
+            if (isValidPath(basePathString, potentialNewSelections)) {
+                preserveSubsequent = true;
+                finalSelections = potentialNewSelections;
+                 console.log(`[handleDropdownChange ${id}] Path valid. Preserving subsequent selections.`);
+            } else {
+                 console.log(`[handleDropdownChange ${id}] Path invalid. Resetting subsequent selections.`);
+            }
+        } else {
+             console.log(`[handleDropdownChange ${id}] Empty selection. Resetting subsequent selections.`);
+        }
 
-        // Sync other columns if needed
+        // --- Apply Reset Logic if Preservation Failed ---
+        if (!preserveSubsequent) {
+            // Current reset behavior: slice up to the changed index, add the new value if any.
+            finalSelections = oldSelections.slice(0, index);
+            if (value) {
+                finalSelections[index] = value;
+            }
+            // No need to explicitly set length, slicing handles it.
+        }
+        // --- End New Logic ---
+
+
+        state.dropdownSelections = finalSelections;
+        state.currentIndex = -1; // Reset image index whenever dropdowns change
+
+        // Clear sync disabled flags for levels *after* the changed one,
+        // regardless of preservation, as the path *did* change.
+        // If subsequent selections were reset, their sync status is irrelevant anyway.
+        // If they were preserved, their sync status *should* still be reset conceptually,
+        // as the user made an explicit choice higher up that might invalidate sync assumptions.
+        if (state.syncDisabled) {
+            Object.keys(state.syncDisabled).forEach(key => {
+                if (parseInt(key) > index) {
+                    delete state.syncDisabled[key];
+                }
+            });
+        }
+
+
+        // --- Update UI and Sync/Recalculate (remains the same) ---
+        // Update dropdowns first (this also calls updateImageUI)
+        if (typeof updateDropdownsUI === 'function') {
+             updateDropdownsUI(id);
+        } else {
+            console.error("[handleDropdownChange] updateDropdownsUI function is not available.");
+        }
+
+        // Sync other columns if needed (using the *final* value at the changed level)
         const syncCb = col.querySelector(`.syncCheckbox[data-level-index="${index}"]`);
-        if (syncCb && syncCb.checked) { if (typeof syncDropdowns === 'function') syncDropdowns(id, index, value); }
+        if (syncCb && syncCb.checked) {
+            if (typeof syncDropdowns === 'function') {
+                // Pass the actual selected value (or "" if reset)
+                syncDropdowns(id, index, value);
+            } else {
+                console.error("[handleDropdownChange] syncDropdowns function not available.");
+            }
+        }
 
-        // THEN Recalculate master list
-        if (typeof recalculateCombinedImageList === 'function') { recalculateCombinedImageList(); }
-        else { console.error("recalculateCombinedImageList function not available."); }
+        // THEN Recalculate master image list based on the potentially changed folder content
+        if (typeof recalculateCombinedImageList === 'function') {
+             recalculateCombinedImageList();
+        } else {
+            console.error("[handleDropdownChange] recalculateCombinedImageList function not available.");
+        }
 
         updatePermalink();
     }
