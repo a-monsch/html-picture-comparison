@@ -1,7 +1,7 @@
 import { fileStructure } from './fileStructure.js';
 import { columnsState, getColumnState, getColumnElement } from './state.js';
 // Import updateImageUI, NOT updateDropdownsUI for core logic here
-import { updateImageUI } from './domUtils.js';
+import { updateDropdownsUI, updateImageUI } from './domUtils.js';
 import { parsePath, getNested, getImageFilesInDir } from './helpers.js';
 
 // --- NEW: Global Navigation State ---
@@ -333,26 +333,81 @@ export function applyDarkMode(isDark) {
 }
 
 // --- Search Logic ---
+/**
+ * Finds potential matching paths or subdirectories/files based on a query string.
+ * Excludes PDF files from the results.
+ * @param {string} query - The path query string.
+ * @returns {string[]} An array of matching path strings (excluding PDFs).
+ */
 export function findMatchingPaths(query) {
     if (!query) return [];
     if (typeof fileStructure === 'undefined') return [];
-    const queryParts = parsePath(query); if (queryParts.length === 0) return [];
-    let currentLevelObj = fileStructure; let currentPathParts = []; let found = true;
+
+    // Helper to filter out PDFs
+    const isNotPdf = (key) => typeof key === 'string' && !key.toLowerCase().endsWith('.pdf');
+
+    const queryParts = parsePath(query);
+    if (queryParts.length === 0) return [];
+
+    let currentLevelObj = fileStructure;
+    let currentPathParts = [];
+    let found = true;
+
     try {
         for (let i = 0; i < queryParts.length; i++) {
             const part = queryParts[i];
-            if (!currentLevelObj || typeof currentLevelObj !== 'object') { found = false; break; }
-            if (currentLevelObj.hasOwnProperty(part)) { currentLevelObj = currentLevelObj[part]; currentPathParts.push(part); }
-            else {
+            if (!currentLevelObj || typeof currentLevelObj !== 'object') {
+                found = false;
+                break;
+            }
+            if (currentLevelObj.hasOwnProperty(part)) {
+                currentLevelObj = currentLevelObj[part];
+                currentPathParts.push(part);
+            } else {
+                // Check for partial match only at the last part of the query
                 if (i === queryParts.length - 1) {
-                     const partialMatchKeys = Object.keys(currentLevelObj).filter(key => key.startsWith(part));
-                     if (partialMatchKeys.length > 0) { return partialMatchKeys.map(key => [...currentPathParts, key].join('/')); }
+                    const partialMatchKeys = Object.keys(currentLevelObj)
+                        .filter(key => key.startsWith(part) && isNotPdf(key)); // Exclude PDFs here
+
+                    if (partialMatchKeys.length > 0) {
+                        // Return full paths for partial matches
+                        return partialMatchKeys
+                               .sort() // Sort partial matches
+                               .map(key => [...currentPathParts, key].join('/'));
+                    }
                 }
-                found = false; break;
+                // No exact match or partial match found for this part
+                found = false;
+                break;
             }
         }
-    } catch (error) { console.error("[findMatchingPaths] Error traversing file structure:", error); return []; }
-    if (found && currentLevelObj && typeof currentLevelObj === 'object') { return Object.keys(currentLevelObj).sort().map(key => [...currentPathParts, key].join('/')); }
-    else if (found && currentLevelObj === null) { return [currentPathParts.join('/')]; }
+    } catch (error) {
+        console.error("[findMatchingPaths] Error traversing file structure:", error);
+        return [];
+    }
+
+    // If exact path found and it leads to a directory object
+    if (found && currentLevelObj && typeof currentLevelObj === 'object') {
+        // Return list of items within the directory (excluding PDFs)
+        return Object.keys(currentLevelObj)
+               .filter(isNotPdf) // Exclude PDFs here
+               .sort()
+               .map(key => [...currentPathParts, key].join('/'));
+    }
+    // If exact path found and it leads to a file (e.g., user typed full file path - currentLevelObj might be null or primitive)
+    // We only want to suggest *items within* a directory, or partial matches.
+    // An exact match to a file shouldn't list the file itself as a suggestion,
+    // unless it was a partial match handled above.
+    // If the path leads exactly to a file, suggest nothing further from here.
+    // Returning the exact path might be desired if the user paused typing?
+    // For consistency with suggestion purpose, let's return empty if exact match is a non-directory.
+    // However, the current logic already handles the case where currentLevelObj is not an object by setting `found = false` earlier.
+    // Let's refine the logic: if found is true, but currentLevelObj is NOT an object, it means the path exactly matched a file. Return empty suggestion list.
+    if (found && (currentLevelObj === null || typeof currentLevelObj !== 'object')) {
+        return []; // Exact path is a file, no further suggestions from *within* it.
+    }
+
+
+    // If path was not found at some point
     return [];
 }

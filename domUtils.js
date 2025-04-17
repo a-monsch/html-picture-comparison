@@ -217,19 +217,70 @@ export function updateImageUI(columnId) {
 
 
 // --- Search and Drag/Drop Helpers ---
-export function updateSearchResultsPreview(columnId, results, clickCallback) {
+/**
+ * Updates the search results preview dropdown, adding hover and keyboard highlighting.
+ * @param {string} columnId - The ID of the column.
+ * @param {string[]} results - Array of path strings to display.
+ * @param {function(string)} selectionCallback - Function to call when a result is definitively selected (click or Enter).
+ */
+export function updateSearchResultsPreview(columnId, results, selectionCallback) {
     const columnElement = getColumnElement(columnId); if (!columnElement) return;
     const previewContainer = columnElement.querySelector('.searchResultsPreview'); if (!previewContainer) return;
-    previewContainer.innerHTML = '';
+
+    // --- Helper function to manage highlight ---
+    const updateHighlight = (indexToHighlight) => {
+        const items = previewContainer.querySelectorAll('div[data-index]');
+        items.forEach((item, idx) => {
+            item.classList.toggle('highlighted', idx === indexToHighlight);
+        });
+        if (indexToHighlight >= 0 && indexToHighlight < items.length) {
+             // Ensure the highlighted item is visible within the scrollable preview
+             items[indexToHighlight].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+        previewContainer.dataset.selectedIndex = indexToHighlight; // Store current index
+    };
+    // --- End Helper ---
+
+    previewContainer.innerHTML = ''; // Clear previous results
+    previewContainer.removeAttribute('data-selected-index'); // Reset selected index attribute
+
     if (results.length > 0) {
-        results.forEach(result => {
-            const div = document.createElement('div'); div.textContent = result; div.title = result;
-            div.addEventListener('click', () => { clickCallback(result); previewContainer.style.display = 'none'; });
-            div.addEventListener('mousedown', (e) => { e.preventDefault(); });
+        results.forEach((result, index) => {
+            const div = document.createElement('div');
+            div.textContent = result;
+            div.title = result;
+            div.dataset.index = String(index); // Add index for navigation
+
+            // Click selects the item
+            div.addEventListener('click', () => {
+                selectionCallback(result); // Use the callback
+                // Preview hidden by selectionCallback's flow now
+            });
+
+            // Mouse hover updates highlight and stored index
+            div.addEventListener('mouseenter', () => {
+                updateHighlight(index); // Highlight this item
+            });
+
+            // Mouse leave removes highlight (unless it's the keyboard-selected one)
+            // Let keyboard handler manage persistence, just remove hover effect visually
+            // Update: Simpler to just let updateHighlight handle everything.
+            // The next mouseenter or keydown will correct the highlight.
+
+            // Prevent blur on input when clicking preview item
+            div.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
+
             previewContainer.appendChild(div);
         });
         previewContainer.style.display = 'block';
-    } else { previewContainer.style.display = 'none'; }
+        // Initialize with no highlight
+        updateHighlight(-1); // Set index to -1 initially
+
+    } else {
+        previewContainer.style.display = 'none';
+    }
 }
 export function hideSearchPreview(columnId) { const col = getColumnElement(columnId); if(col) { const prev = col.querySelector('.searchResultsPreview'); if(prev) prev.style.display = 'none'; } }
 export function setDraggingStyle(columnElement, isDragging) { if(columnElement) columnElement.classList.toggle('dragging', isDragging); }

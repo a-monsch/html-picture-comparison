@@ -22,6 +22,8 @@
             --preview-bg: #f9f9f9;
             --preview-border: #ddd;
             --preview-hover-bg: #eee;
+            --preview-highlight-bg: #d6eaff; /* Added highlight color */
+            --preview-highlight-text: #0056b3; /* Added highlight text color */
         }
         html, body { height: 100%; margin: 0; overflow: hidden; }
         body {
@@ -41,14 +43,16 @@
             --preview-bg: #3a3a3a;
             --preview-border: #555;
             --preview-hover-bg: #484848;
+            --preview-highlight-bg: #0056b3; /* Dark mode highlight color */
+            --preview-highlight-text: #e0e0e0; /* Dark mode highlight text color */
         }
 
         /* --- Controls --- */
-        #controls { /* ... keep as is ... */
+        #controls {
             padding: 10px; border-bottom: 1px solid var(--border-color); display: flex;
             gap: 10px; align-items: center; flex-wrap: wrap; flex-shrink: 0;
         }
-        #controls button, #controls label { /* ... keep as is ... */
+        #controls button, #controls label {
             padding: 8px 12px; border: 1px solid var(--input-border); background-color: var(--button-bg);
             color: var(--text-color); border-radius: 4px; cursor: pointer; transition: background-color 0.2s;
         }
@@ -57,13 +61,13 @@
         #controls input[type="checkbox"] { cursor: pointer; margin: 0; }
 
         /* --- Columns Container --- */
-        #columnsContainer { /* ... keep as is ... */
+        #columnsContainer {
             display: flex; gap: 10px; padding: 10px; flex-grow: 1;
             min-height: 0; overflow-y: hidden; overflow-x: auto; box-sizing: border-box;
         }
 
         /* --- Column --- */
-        .column { /* ... keep as is ... */
+        .column {
             border: 1px solid var(--border-color); border-radius: 5px; padding: 10px; background-color: var(--column-bg);
             display: flex; flex-direction: column; gap: 8px; flex-grow: 1; flex-shrink: 1; flex-basis: 0;
             min-width: 250px; position: relative; box-sizing: border-box; overflow: hidden;
@@ -72,7 +76,7 @@
         .column.drag-over { border-left: 3px solid var(--accent-color); }
 
         /* --- Elements within Column (Non-Growing) --- */
-        .column input[type="text"], .column select { /* ... keep as is ... */
+        .column input[type="text"], .column select {
             width: 100%; padding: 6px; border: 1px solid var(--input-border); background-color: var(--input-bg);
             color: var(--text-color); border-radius: 3px; box-sizing: border-box; flex-shrink: 0;
         }
@@ -86,21 +90,30 @@
 
         /* --- Search Preview --- */
         .searchContainer { position: relative; flex-shrink: 0; }
-        .searchResultsPreview { /* ... keep as is ... */
+        .searchResultsPreview {
             position: absolute; background-color: var(--preview-bg); border: 1px solid var(--preview-border);
             border-top: none; border-radius: 0 0 3px 3px; max-height: 150px; overflow-y: auto;
             z-index: 10; width: 100%; box-sizing: border-box; display: none; font-size: 0.9em;
         }
-         .searchResultsPreview div { /* ... keep as is ... */
-              padding: 4px 8px; cursor: pointer; border-bottom: 1px solid var(--preview-border); }
-         .searchResultsPreview div:last-child { border-bottom: none; }
-         .searchResultsPreview div:hover { background-color: var(--preview-hover-bg); }
-
+        .searchResultsPreview div {
+            padding: 4px 8px; cursor: pointer; border-bottom: 1px solid var(--preview-border);
+              transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out; /* Smooth transition */
+              /* Default colors */
+              background-color: var(--preview-bg);
+              color: var(--text-color);
+        }
+        .searchResultsPreview div:last-child { border-bottom: none; }
+        .searchResultsPreview div:hover { background-color: var(--preview-hover-bg); }
+        .searchResultsPreview div.highlighted {
+            background-color: var(--preview-highlight-bg);
+            color: var(--preview-highlight-text);
+            font-weight: bold; /* Optional: make it bolder */
+        }
         /* --- Dropdowns --- */
-        .dropdownLevel { /* ... keep as is ... */
+        .dropdownLevel {
              display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
         .dropdownLevel select { flex-grow: 1; min-width: 50px; }
-        .dropdownLevel input[type="checkbox"].syncCheckbox { /* ... keep as is ... */
+        .dropdownLevel input[type="checkbox"].syncCheckbox {
             flex-shrink: 0; margin-left: 5px; cursor: pointer; width: var(--sync-checkbox-size);
             height: var(--sync-checkbox-size); accent-color: var(--accent-color);
         }
@@ -195,7 +208,7 @@
 
 
         /* --- Other Styles --- */
-        .deleteColumnBtn { /* ... keep as is ... */
+        .deleteColumnBtn {
             position: absolute; top: 5px; right: 5px; background-color: var(--danger-color); color: white;
             border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 14px;
             line-height: 18px; text-align: center; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; padding: 0; z-index: 1;

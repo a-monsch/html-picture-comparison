@@ -30,39 +30,76 @@ const addColumnBtn = document.getElementById('addColumnBtn');
 const permalinkBtn = document.getElementById('permalinkBtn');
 const darkModeToggle = document.getElementById('darkModeToggle');
 
-// --- Debounced Resize Handler ---
+// Not changed: debouncedSyncLayout
 const debouncedSyncLayout = (typeof debounce === 'function' && typeof syncDropdownContainerHeights === 'function')
     ? debounce(syncDropdownContainerHeights, 250) // Sync dropdowns on resize
     : () => { console.warn("Debounce or syncDropdownContainerHeights not available for resize."); };
 
 
-// --- Initialization Functions ---
+/**
+ * Creates a new column instance: state object, DOM element, listeners, initial UI update.
+ * @param {object} initialState - Optional initial state for the column.
+ * @returns {HTMLElement|null} The created column element or null on failure.
+ */
 function createColumnInstance(initialState = {}) {
     // Purpose: Create state, create DOM element, append, attach listeners, run initial UI update
     if (typeof generateId !== 'function' || typeof addColumnToState !== 'function' || typeof createColumnElement !== 'function') { console.error("Essential functions not loaded!"); return null; }
     const newId = generateId();
-    const newState = { id: newId, title: initialState.title || '', path: initialState.path || 'data/', dropdownSelections: initialState.dropdownSelections || [], syncDisabled: (typeof initialState.syncDisabled === 'object' && initialState.syncDisabled !== null) ? initialState.syncDisabled : {},
+    const newState = {
+        id: newId,
+        title: initialState.title || '',
+        path: initialState.path || 'data/',
+        dropdownSelections: initialState.dropdownSelections || [],
+        syncDisabled: (typeof initialState.syncDisabled === 'object' && initialState.syncDisabled !== null) ? initialState.syncDisabled : {},
         currentIndex: initialState.currentIndex ?? -1, // Default to -1 (no image selected initially)
         currentImageFiles: [],
     };
     addColumnToState(newState);
     const columnFragment = createColumnElement(newState, newId); if (!columnFragment) { return null; }
     if (!columnsContainer) { return null; } columnsContainer.appendChild(columnFragment); const columnElement = columnsContainer.querySelector(`.column[data-id="${newId}"]`); if (!columnElement) { return null; }
+
     try { // Attach listeners
         if (typeof handlers !== 'object' || handlers === null) throw new Error("handlers object not loaded");
-        const titleInput=columnElement.querySelector('.columnTitle'); if(titleInput&&handlers.handleTitleChange) titleInput.addEventListener('input',handlers.handleTitleChange);
-        const pathInput=columnElement.querySelector('.pathInput'); if(pathInput&&handlers.handlePathInputChange&&handlers.handlePathInputBlur){pathInput.addEventListener('input',handlers.handlePathInputChange); pathInput.addEventListener('blur',handlers.handlePathInputBlur);}
-        const dropdownContainer=columnElement.querySelector('.dropdownContainer'); if(dropdownContainer&&handlers.handleDropdownChange&&handlers.handleSyncCheckboxChange){dropdownContainer.addEventListener('change',(event)=>{if(event.target.tagName==='SELECT')handlers.handleDropdownChange(event); else if(event.target.tagName==='INPUT'&&event.target.classList.contains('syncCheckbox'))handlers.handleSyncCheckboxChange(event);});}
-        const deleteBtn=columnElement.querySelector('.deleteColumnBtn'); if(deleteBtn&&handlers.handleDeleteColumnClick)deleteBtn.addEventListener('click',handlers.handleDeleteColumnClick);
-        if(handlers.handleDragStart)columnElement.addEventListener('dragstart',handlers.handleDragStart); if(handlers.handleDragEnd)columnElement.addEventListener('dragend',handlers.handleDragEnd);
-    } catch (e) { console.error(`Error attaching listeners:`, e); return null; }
+
+        const titleInput = columnElement.querySelector('.columnTitle');
+        if (titleInput && handlers.handleTitleChange) {
+            titleInput.addEventListener('input', handlers.handleTitleChange);
+        }
+
+        const pathInput = columnElement.querySelector('.pathInput');
+        if (pathInput && handlers.handlePathInputChange && handlers.handlePathInputBlur && handlers.handlePathInputKeyDown) { // <<< Added KeyDown Handler
+            pathInput.addEventListener('input', handlers.handlePathInputChange);
+            pathInput.addEventListener('blur', handlers.handlePathInputBlur);
+            pathInput.addEventListener('keydown', handlers.handlePathInputKeyDown); // <<< Attach KeyDown Listener
+        }
+
+        const dropdownContainer = columnElement.querySelector('.dropdownContainer');
+        if (dropdownContainer && handlers.handleDropdownChange && handlers.handleSyncCheckboxChange) {
+            dropdownContainer.addEventListener('change', (event) => {
+                if (event.target.tagName === 'SELECT') handlers.handleDropdownChange(event);
+                else if (event.target.tagName === 'INPUT' && event.target.classList.contains('syncCheckbox')) handlers.handleSyncCheckboxChange(event);
+            });
+        }
+
+        const deleteBtn = columnElement.querySelector('.deleteColumnBtn');
+        if (deleteBtn && handlers.handleDeleteColumnClick) {
+            deleteBtn.addEventListener('click', handlers.handleDeleteColumnClick);
+        }
+
+        if (handlers.handleDragStart) columnElement.addEventListener('dragstart', handlers.handleDragStart);
+        if (handlers.handleDragEnd) columnElement.addEventListener('dragend', handlers.handleDragEnd);
+
+    } catch (e) { console.error(`Error attaching listeners for column ${newId}:`, e); return null; }
+
     try { // Initial UI Update
         if (typeof updateDropdownsUI !== 'function') throw new Error("updateDropdownsUI function not available.");
         updateDropdownsUI(newId); // Calls syncDropdownContainerHeights and updateImageUI inside
-    } catch (error) { console.error(`Error during initial updateDropdownsUI:`, error); try { if (columnElement) columnElement.remove(); if (typeof removeColumnFromState === 'function') removeColumnFromState(newId); } catch (e) {} return null; }
+    } catch (error) { console.error(`Error during initial updateDropdownsUI for column ${newId}:`, error); try { if (columnElement) columnElement.remove(); if (typeof removeColumnFromState === 'function') removeColumnFromState(newId); } catch (e) {} return null; }
+
     if (darkModeToggle?.checked) { // Apply Dark Mode if needed now
         const imgElement = columnElement.querySelector('.displayImage'); if (imgElement && typeof invertImageDisplay === 'function') { invertImageDisplay(imgElement, true); }
     }
+
     // NO recalculate/sync calls here - do it after creation loop/event
     return columnElement;
 }
