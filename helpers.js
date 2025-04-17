@@ -1,4 +1,3 @@
-// --- General Utility Functions ---
 import { fileStructure } from './fileStructure.js'; // Assuming fileStructure is accessible like this
 
 /**
@@ -115,15 +114,12 @@ export function isValidPath(basePathString, selections) {
                 break;
             }
             dropdownIndex++;
-        } // End subsequent selections loop
+        }
 
     } catch (error) {
         console.error(`[isValidPath] Error during traversal:`, error);
         pathIsValid = false;
         currentLevelObj = null;
     }
-
-    // Final check: The path is valid if we successfully traversed all segments/selections
-    // AND the final currentLevelObj is a directory (object).
     return pathIsValid && currentLevelObj && typeof currentLevelObj === 'object';
 }

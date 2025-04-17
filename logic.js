@@ -1,23 +1,18 @@
 import { fileStructure } from './fileStructure.js';
 import { columnsState, getColumnState, getColumnElement } from './state.js';
-// Import updateImageUI, NOT updateDropdownsUI for core logic here
 import { updateDropdownsUI, updateImageUI } from './domUtils.js';
 import { parsePath, getNested, getImageFilesInDir } from './helpers.js';
 
-// --- NEW: Global Navigation State ---
 let globalImageIndex = 0;
 let combinedImageList = [];
 
-// --- NEW: Export Getter Functions ---
 export function getCombinedImageList() {
-    // Return a copy to prevent accidental modification? Or trust consumers? Let's return direct for now.
     return combinedImageList;
 }
 export function getGlobalImageIndex() {
     return globalImageIndex;
 }
 
-// --- NEW: Recalculate Combined List ---
 /**
  * Recalculates the combined list of unique image filenames across all active columns.
  * Updates each column's internal file list cache.
@@ -87,13 +82,10 @@ export function recalculateCombinedImageList() {
     }
      console.log(`[recalculateCombinedImageList] Adjusted global index to: ${globalImageIndex}`);
 
-
-    // Update all displays based on the new list and potentially adjusted index
     updateAllColumnsDisplay();
 }
 
 
-// --- NEW: Update All Displays ---
 /**
  * Updates the display of ALL columns based on the current globalImageIndex
  * and the combinedImageList. Sets column's currentIndex appropriately.
@@ -134,18 +126,15 @@ export function updateAllColumnsDisplay() {
                            : -1;
 
         state.currentIndex = localIndex; // Set index (-1 if not found)
-        // console.log(`[updateAllColumnsDisplay] Column ${state.id}: Local index for "${currentMasterFilename}" is ${localIndex}.`); // Verbose
 
-        // Call updateImageUI for this column
-         if (typeof updateImageUI === 'function') {
-             updateImageUI(state.id);
-         } else {
-             console.error(`[updateAllColumnsDisplay] updateImageUI function not available!`);
-         }
+        if (typeof updateImageUI === 'function') {
+            updateImageUI(state.id);
+        } else {
+            console.error(`[updateAllColumnsDisplay] updateImageUI function not available!`);
+        }
     });
 }
 
-// --- NEW: Global Navigation ---
 /**
  * Navigates the global index and updates all column displays.
  * @param {number} direction -1 for previous, 1 for next.
@@ -162,7 +151,6 @@ export function navigateGlobalImageIndex(direction) {
     updateAllColumnsDisplay(); // Update based on new index
 }
 
-// --- Image Navigation ---
 /**
  * Navigates to the previous/next image in the source column and attempts
  * to sync other columns by matching the filename in their respective folders.
@@ -219,12 +207,10 @@ export function navigateImage(sourceColumnId, direction) {
             console.log(`[navigateImage sync ${targetColumnId}] Found filename "${targetFilename}" at index: ${targetIndex}.`);
         }
 
-        // Update the target column's UI to reflect the new index (or -1)
         updateImageUI(targetColumnId);
     });
 }
 
-// --- Dropdown Synchronization ---
 export function syncDropdowns(sourceColumnId, levelIndex, selectedValue) {
     console.log(`[syncDropdowns] Source: ${sourceColumnId}, Level: ${levelIndex}, Value: "${selectedValue}"`);
     columnsState.forEach(targetState => {
@@ -321,7 +307,6 @@ export function invertImageDisplay(imgElement, forceInvert) {
     tempImg.src = originalSrc;
 }
 export function applyDarkMode(isDark) {
-    // console.log(`[applyDarkMode] Setting dark mode to: ${isDark}`); // Reduce noise
     document.body.classList.toggle('dark-mode', isDark);
     const container = document.getElementById('columnsContainer');
     if (!container) { console.error("[applyDarkMode] columnsContainer not found."); return; }
@@ -332,7 +317,7 @@ export function applyDarkMode(isDark) {
     } catch (error) { console.error("[applyDarkMode] Error processing images:", error); }
 }
 
-// --- Search Logic ---
+// search logic
 /**
  * Finds potential matching paths or subdirectories/files based on a query string.
  * Excludes PDF files from the results.
@@ -340,14 +325,23 @@ export function applyDarkMode(isDark) {
  * @returns {string[]} An array of matching path strings (excluding PDFs).
  */
 export function findMatchingPaths(query) {
-    if (!query) return [];
-    if (typeof fileStructure === 'undefined') return [];
+    if (!query || typeof fileStructure === 'undefined') return [];
 
-    // Helper to filter out PDFs
-    const isNotPdf = (key) => typeof key === 'string' && !key.toLowerCase().endsWith('.pdf');
+    // Use a regex that matches common file extensions (case-insensitive)
+    // and only suggest directories or files *without* these extensions in intermediate parts.
+    // For the final part, allow matching any type except .pdf.
+    const fileExtensionRegex = /\.(png|jpg|jpeg|gif|bmp|svg|pdf)$/i; // Added common image formats for robustness
+    const isDirectoryOrImage = (key) => typeof key === 'string' && (!fileExtensionRegex.test(key) || key.toLowerCase().endsWith('.png')); // Allow .png files in suggestions
 
     const queryParts = parsePath(query);
-    if (queryParts.length === 0) return [];
+    if (queryParts.length === 0) {
+        // If query is empty (just '/'), list top-level items (excluding PDFs)
+        let topLevelKeys = Object.keys(fileStructure)
+                            .filter(isDirectoryOrImage)
+                            .sort();
+        // Return as full paths (e.g., "data/")
+        return topLevelKeys.map(key => key + (typeof fileStructure[key] === 'object' ? '/' : ''));
+    }
 
     let currentLevelObj = fileStructure;
     let currentPathParts = [];
@@ -360,20 +354,50 @@ export function findMatchingPaths(query) {
                 found = false;
                 break;
             }
+
+            // Check if the current part is an exact match (directory or file)
             if (currentLevelObj.hasOwnProperty(part)) {
-                currentLevelObj = currentLevelObj[part];
-                currentPathParts.push(part);
+                 // If it's the last part of the query:
+                 if (i === queryParts.length - 1) {
+                    const target = currentLevelObj[part];
+                     // If the exact match is a directory, list its contents (excluding PDFs)
+                    if (typeof target === 'object') {
+                        return Object.keys(target)
+                               .filter(isDirectoryOrImage) // Filter contents
+                               .sort()
+                               .map(key => [...currentPathParts, part, key].join('/'));
+                    } else if (part.toLowerCase().endsWith('.png')) {
+                        // If the exact match is a PNG file, suggest just the file itself?
+                        // Or should it be the parent directory's contents? Let's stick to parent contents.
+                        // If user typed the full PNG name, maybe suggesting just the name itself is useful.
+                        // Let's return just the matched PNG file name.
+                         return [[...currentPathParts, part].join('/')]; // Return the exact matched PNG path
+                    } else {
+                         // Exact match is a non-PNG file (like PDF) - no further suggestions
+                         return [];
+                    }
+                 } else {
+                    // Not the last part, must be a directory to continue traversal
+                    if (typeof currentLevelObj[part] === 'object') {
+                        currentLevelObj = currentLevelObj[part];
+                        currentPathParts.push(part);
+                    } else {
+                        // Intermediate part is not a directory
+                        found = false;
+                        break;
+                    }
+                 }
             } else {
-                // Check for partial match only at the last part of the query
+                // No exact match for the current part. Look for partial matches *only if it's the last part*.
                 if (i === queryParts.length - 1) {
                     const partialMatchKeys = Object.keys(currentLevelObj)
-                        .filter(key => key.startsWith(part) && isNotPdf(key)); // Exclude PDFs here
+                        .filter(key => key.startsWith(part) && isDirectoryOrImage(key)); // Filter partial matches (no PDFs)
 
                     if (partialMatchKeys.length > 0) {
-                        // Return full paths for partial matches
+                        // Return full paths for partial matches, ensuring trailing slash for dirs
                         return partialMatchKeys
-                               .sort() // Sort partial matches
-                               .map(key => [...currentPathParts, key].join('/'));
+                               .sort()
+                               .map(key => [...currentPathParts, key].join('/') + (typeof currentLevelObj[key] === 'object' ? '/' : ''));
                     }
                 }
                 // No exact match or partial match found for this part
@@ -382,32 +406,24 @@ export function findMatchingPaths(query) {
             }
         }
     } catch (error) {
-        console.error("[findMatchingPaths] Error traversing file structure:", error);
+        console.error("[findMatchingPaths] Error during traversal:", error);
         return [];
     }
 
-    // If exact path found and it leads to a directory object
-    if (found && currentLevelObj && typeof currentLevelObj === 'object') {
-        // Return list of items within the directory (excluding PDFs)
-        return Object.keys(currentLevelObj)
-               .filter(isNotPdf) // Exclude PDFs here
-               .sort()
-               .map(key => [...currentPathParts, key].join('/'));
-    }
-    // If exact path found and it leads to a file (e.g., user typed full file path - currentLevelObj might be null or primitive)
-    // We only want to suggest *items within* a directory, or partial matches.
-    // An exact match to a file shouldn't list the file itself as a suggestion,
-    // unless it was a partial match handled above.
-    // If the path leads exactly to a file, suggest nothing further from here.
-    // Returning the exact path might be desired if the user paused typing?
-    // For consistency with suggestion purpose, let's return empty if exact match is a non-directory.
-    // However, the current logic already handles the case where currentLevelObj is not an object by setting `found = false` earlier.
-    // Let's refine the logic: if found is true, but currentLevelObj is NOT an object, it means the path exactly matched a file. Return empty suggestion list.
-    if (found && (currentLevelObj === null || typeof currentLevelObj !== 'object')) {
-        return []; // Exact path is a file, no further suggestions from *within* it.
-    }
+    // If we reached here and `found` is true, it means the query path *exactly* matched a directory,
+    // and the loop didn't return (which happens when the last part is an exact match).
+    // This case should actually be handled by the `if (i === queryParts.length - 1)` block inside the loop.
+    // If the loop finishes, it means the path was traversed successfully *but wasn't the last part*.
+    // This might happen if the input ends with '/', e.g., "data/f1/".
+    // In this case, list the contents of the final directory.
+     if (found && currentLevelObj && typeof currentLevelObj === 'object') {
+          return Object.keys(currentLevelObj)
+              .filter(isDirectoryOrImage) // Filter contents
+              .sort()
+              .map(key => [...currentPathParts, key].join('/') + (typeof currentLevelObj[key] === 'object' ? '/' : ''));
+     }
 
 
-    // If path was not found at some point
+    // If path was not found or leads to a non-directory intermediate
     return [];
 }

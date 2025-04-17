@@ -1,26 +1,21 @@
 import { fileStructure } from './fileStructure.js';
-// Ensure ALL necessary state functions are imported
 import {
     columnsState, setColumnsContainerRef, addColumnToState,
     loadStateFromPermalink, updatePermalink, generateId, setNextColumnId,
     getColumnState, removeColumnFromState, updateColumnOrderState // Added updateColumnOrderState just in case
 } from './state.js';
-// Ensure ALL necessary domUtils functions are imported
 import {
     createColumnElement, updateDropdownsUI, hideSearchPreview, updateImageUI,
     updateSearchResultsPreview, setDraggingStyle, clearDragOverStyles,
     setDragOverStyle, getDragAfterElement,
     syncDropdownContainerHeights // <<< Import dropdown sync function
 } from './domUtils.js';
-// Ensure ALL necessary logic functions are imported, INCLUDING global nav
 import {
     applyDarkMode, invertImageDisplay, syncDropdowns, findMatchingPaths,
     recalculateCombinedImageList, navigateGlobalImageIndex, // <<< NEW global nav functions
     getCombinedImageList, getGlobalImageIndex // <<< Keep Getters needed by domUtils
 } from './logic.js';
-// Import all handlers
 import * as handlers from './eventHandlers.js';
-// Import debounce from helpers
 import { debounce } from './helpers.js';
 
 
@@ -131,7 +126,6 @@ function initializeApp() {
     const canSyncDropdowns = typeof syncDropdownContainerHeights === 'function';
     const canHidePreview = typeof hideSearchPreview === 'function';
     const canRecalculate = typeof recalculateCombinedImageList === 'function'; // Check recalculate function
-    // ------------------------------------------------------------------
 
     // --- Attach Global Event Listeners ---
     // Add Column Listener (Calls recalculate)

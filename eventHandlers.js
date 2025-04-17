@@ -1,15 +1,11 @@
 import { fileStructure } from './fileStructure.js';
-// Import state functions used in this module
 import { columnsState, getColumnState, getColumnElement, updateColumnOrderState, updatePermalink, addColumnToState, removeColumnFromState } from './state.js'; // Keep columnsState
-// Import ALL domUtils functions used in this module
 import {
     updateDropdownsUI, hideSearchPreview, updateSearchResultsPreview,
     setDraggingStyle, clearDragOverStyles, setDragOverStyle, getDragAfterElement,
     syncDropdownContainerHeights, updateImageUI // Keep updateImageUI import (needed elsewhere)
 } from './domUtils.js';
-// Import logic functions
 import { findMatchingPaths, recalculateCombinedImageList, navigateGlobalImageIndex } from './logic.js'; // Removed syncDropdowns
-// Import helper functions used
 import { debounce, parsePath, getNested, isValidPath } from './helpers.js';
 
 let draggedColumnElement = null;
@@ -24,33 +20,31 @@ function finalizePathInputState(columnId, currentPathValue) {
     const state = getColumnState(columnId);
     if (!state) return;
 
-    // Update state only if the value has actually changed from the stored state
-    // or if dropdowns need resetting (which they often do on path interaction)
-    // Or if the path is different from what's currently rendered (input.value check is implicit here)
-    if (state.path !== currentPathValue || state.dropdownSelections.length > 0) { // Simplified check - path change implies UI/state update needed
-        console.log(`[finalizePathInputState ${columnId}] Updating state for path: "${currentPathValue}"`);
-        state.path = currentPathValue;
-        state.dropdownSelections = []; // Always reset dropdowns on path change/finalization
-        state.syncDisabled = {};
-        state.currentIndex = -1; // Reset image index
+    console.log(`[finalizePathInputState ${columnId}] Updating state for path: "${currentPathValue}"`);
+    state.path = currentPathValue;
+    const oldPathParts = parsePath(state.path || ''); // Old path in state *before* update
+    const newPathParts = parsePath(currentPathValue || ''); // New path from input
 
-        if (typeof updateDropdownsUI === 'function') {
-            updateDropdownsUI(columnId); // Update dropdowns based on new path
-        } else {
-            console.error("finalizePathInputState: updateDropdownsUI function is not available.");
-        }
+    state.dropdownSelections = []; // Always reset dropdowns on path input change/finalization
+    state.syncDisabled = {};     // Reset sync flags
+    state.currentIndex = -1;     // Reset image index initially; selectSearchResult will set it for files
 
-        if (typeof recalculateCombinedImageList === 'function') {
-            recalculateCombinedImageList(); // Update global image list
-        } else {
-            console.error("finalizePathInputState: recalculateCombinedImageList function is not available.");
-        }
-
-        updatePermalink(); // Save the state
+    if (typeof updateDropdownsUI === 'function') {
+        updateDropdownsUI(columnId); // Update dropdowns based on new path
     } else {
-         console.log(`[finalizePathInputState ${columnId}] Path "${currentPathValue}" seems unchanged or state is already consistent. Skipping redundant update.`);
+        console.error("finalizePathInputState: updateDropdownsUI function is not available.");
     }
+
+    if (typeof recalculateCombinedImageList === 'function') {
+        recalculateCombinedImageList(); // Update global image list
+    } else {
+        console.error("finalizePathInputState: recalculateCombinedImageList function is not available.");
+    }
+
+    updatePermalink(); // Save the state
+
 }
+
 
 /**
  * Central handler for selecting a search result via click or Enter.
@@ -83,40 +77,41 @@ function selectSearchResult(columnId, selectedPath) {
         const parentDir = parts.join('/') + (parts.length > 0 ? '/' : ''); // Add trailing slash if not root
 
         console.log(`[selectSearchResult ${columnId}] Setting path to parent directory: "${parentDir}"`);
-        input.value = parentDir; // Update input field
-        hideSearchPreview(columnId); // Hide preview
 
-        // Update state/UI for the parent directory FIRST
-        // This is crucial so that state.currentImageFiles gets populated correctly
+        // 1. Hide the search preview FIRST
+        hideSearchPreview(columnId);
+
+        // 2. Update the input field value (do this *before* finalizing state)
+        input.value = parentDir;
+
+        // 3. Update state/UI for the parent directory
+        // This will reset dropdowns, currentIndex to -1, and populate currentImageFiles for the parent dir.
         finalizePathInputState(columnId, parentDir);
 
-        // Now, if it was a PNG, try to select it in the updated state
+        // 4. Now, if it was a PNG, try to select it in the updated state
         if (isPngFile) {
-            // Re-fetch state as finalizePathInputState might have modified it indirectly
-            // (though unlikely in this specific case, it's safer)
-            state = getColumnState(columnId);
-            if (!state) return; // Guard if column was removed somehow
+            // state was just updated by finalizePathInputState, so currentImageFiles should be accurate
+            state = getColumnState(columnId); // Re-fetch state to be safe
+            if (!state) { console.error(`[selectSearchResult ${columnId}] State missing after finalize!`); return; }
 
             const imageFiles = state.currentImageFiles || [];
             const newIndex = imageFiles.indexOf(selectedFilename);
-            console.log(`[selectSearchResult ${columnId}] Trying to select "${selectedFilename}". Found at index: ${newIndex} in [${imageFiles.join(', ')}]`);
+            console.log(`[selectSearchResult ${columnId}] Trying to select "${selectedFilename}". Found at index: ${newIndex} in list of ${imageFiles.length} images.`);
 
             if (newIndex > -1) {
-                state.currentIndex = newIndex; // Set the specific index
-                // Update JUST the image display for this column to show the selected image
+                state.currentIndex = newIndex;
+                // Only need to update the image display for this column and the permalink
                 if (typeof updateImageUI === 'function') {
                     updateImageUI(columnId);
                 } else {
                      console.error("selectSearchResult: updateImageUI function is not available.");
                 }
-                updatePermalink(); // Update permalink as currentIndex changed
+                updatePermalink();
             } else {
-                 console.warn(`[selectSearchResult ${columnId}] Could not find selected PNG "${selectedFilename}" in updated image list.`);
-                 // Image will default to index 0 or "not found" based on finalizePathInputState/recalculate logic
+                 console.warn(`[selectSearchResult ${columnId}] Could not find selected PNG "${selectedFilename}" in updated image list for "${parentDir}". Index set to -1.`);
             }
         }
-        // DO NOT trigger next search for file selections
-        return; // Finished handling file selection
+        return;
     }
 
     // --- Handle directory selection (original logic) ---
@@ -128,13 +123,14 @@ function selectSearchResult(columnId, selectedPath) {
     }
     console.log(`[selectSearchResult ${columnId}] Final directory path: "${finalPath}"`);
 
-    // 1. Update the input field value
-    input.value = finalPath;
-
-    // 2. Hide the search preview FIRST
+    // 1. Hide the search preview FIRST
     hideSearchPreview(columnId);
 
+    // 2. Update the input field value
+    input.value = finalPath;
+
     // 3. Update the column's state & UI using the finalization function
+    // This resets dropdowns, index, etc., and builds new dropdowns.
     finalizePathInputState(columnId, finalPath);
 
     // 4. Trigger a new debounced search based on the final path (directory)
@@ -144,8 +140,6 @@ function selectSearchResult(columnId, selectedPath) {
     } else {
          console.error("selectSearchResult: Debounced search function is not available to trigger next suggestions.");
     }
-    // Optional: Set focus back to the input if desired after selection
-    // input.focus();
 }
 
 // Define the debounced function structure once
@@ -165,7 +159,6 @@ const createDebouncedSearch = () => debounce((columnId, query) => {
      });
 }, 300);
 
-// Initialize the debounced search
 let currentDebouncedSearch = createDebouncedSearch();
 
 export function handleTitleChange(event) {
@@ -185,12 +178,8 @@ export function handlePathInputChange(event) {
     const newValue = pathInput.value;
     console.log(`[handlePathInputChange ${id}] Value: "${newValue}"`);
 
-    // --- Immediately update state and UI based on typed input ---
-    // This was the missing piece causing dropdowns not to appear on typing '*' etc.
     finalizePathInputState(id, newValue);
-    // -----------------------------------------------------------
 
-    // Trigger the search preview update via the debounced function
     if (typeof currentDebouncedSearch === 'function') {
         currentDebouncedSearch(id, newValue);
     }
@@ -198,7 +187,8 @@ export function handlePathInputChange(event) {
 
 /**
  * Handles blur events on the path input field.
- * Hides the search preview and potentially finalizes state.
+ * Hides the search preview if focus moves outside.
+ * Finalizes state if focus leaves the input and is not on the preview.
  */
 export function handlePathInputBlur(event) {
     const pathInput = event.target;
@@ -215,19 +205,18 @@ export function handlePathInputBlur(event) {
 
         // Hide if the preview exists, focus is not on the input, and focus is not on a preview item
         if (preview && !isInputFocused && !relatedTargetIsPreviewItem) {
-            console.log(`[handlePathInputBlur ${id}] Hiding preview.`);
+            console.log(`[handlePathInputBlur ${id}] Hiding preview and finalizing state.`);
             hideSearchPreview(id);
-
-            // Optional: Finalize state based on current input value on blur
-            // This ensures if the user clicks away, the dropdowns update
-            // finalizePathInputState(id, pathInput.value); // Uncomment if this behaviour is desired
+             finalizePathInputState(id, pathInput.value);
         } else if (preview && isInputFocused) {
-             // console.log(`[handlePathInputBlur ${id}] Input still focused, not hiding preview.`);
         } else if (preview && relatedTargetIsPreviewItem) {
-             // console.log(`[handlePathInputBlur ${id}] Focus moved to preview item, not hiding preview.`);
+        } else {
+            // If there was no preview, or focus just moved away normally, finalize state
+             console.log(`[handlePathInputBlur ${id}] Focus left input, finalizing state.`);
+             finalizePathInputState(id, pathInput.value);
         }
 
-    }, 150); // Small delay
+    }, 150);
 }
 
 /**
@@ -242,31 +231,22 @@ export function handlePathInputKeyDown(event) {
     const previewContainer = col.querySelector('.searchResultsPreview');
     const isPreviewVisible = previewContainer && previewContainer.style.display !== 'none';
 
-    // --- Handle Escape Key ---
     if (event.key === 'Escape') {
         event.preventDefault(); // Prevent other browser actions
         if (isPreviewVisible) {
             // First Escape: Hide preview
             console.log(`[handlePathInputKeyDown ${columnId}] Escape (1st): Hiding preview.`);
             hideSearchPreview(columnId);
-            // Don't blur yet, allow user to continue typing or press Esc again
-            // Don't finalize state here, let user continue typing or press Esc again to blur/finalize
         } else {
             // Second Escape (Preview not visible, but input is focused): Blur the input
             console.log(`[handlePathInputKeyDown ${columnId}] Escape (2nd): Blurring input.`);
-            pathInput.blur(); // This removes focus, allowing global keys
-            // Finalize state on blur? The blur handler could do this, or we could do it here.
-            // Let's finalize here for consistency if blur handler doesn't.
-            // finalizePathInputState(columnId, pathInput.value); // Finalize based on current text
+            pathInput.blur(); // This removes focus, allowing global keys. Blur handler will finalize state.
         }
         return; // Stop further processing for Escape
     }
-    // --- End Escape Key Handling ---
 
-
-    // --- Handle Arrow/Enter Keys (only if preview is visible) ---
     if (!isPreviewVisible) {
-        return; // Ignore navigation keys if preview isn't showing
+        return;
     }
 
     const resultsItems = previewContainer.querySelectorAll('div[data-index]');
@@ -275,7 +255,6 @@ export function handlePathInputKeyDown(event) {
     let currentIndex = parseInt(previewContainer.dataset.selectedIndex || '-1', 10);
     let nextIndex = currentIndex;
 
-    // --- Helper to update highlight and store index ---
     const updateHighlight = (indexToHighlight) => {
         resultsItems.forEach((item, idx) => {
             item.classList.toggle('highlighted', idx === indexToHighlight);
@@ -285,7 +264,6 @@ export function handlePathInputKeyDown(event) {
          }
         previewContainer.dataset.selectedIndex = indexToHighlight;
     };
-    // --- End Helper ---
 
     switch (event.key) {
         case 'ArrowDown':
@@ -315,11 +293,8 @@ export function handlePathInputKeyDown(event) {
             }
             break; // Exit switch after handling Enter
 
-        // Escape is handled above this switch
-
         default:
-            // Allow other keys (like typing) to pass through
-            break;
+            break; // Allow other keys (like typing) to pass through
     }
 }
 
@@ -337,9 +312,6 @@ export function handleDropdownChange(event) {
 
     // --- Guard against programmatic sync loops ---
     if (event.isProgrammaticSync) {
-        // console.log(`[handleDropdownChange ${currentColumnId}] Processing programmatic sync for level ${index}`);
-        // This block handles updates *within* the column that received the sync event
-
         const oldSelections = [...state.dropdownSelections]; // Use current selections of the target
         const pathInput = col.querySelector('.pathInput');
         const basePathString = pathInput?.value || '';
@@ -380,7 +352,6 @@ export function handleDropdownChange(event) {
             }
         }
 
-        // Update this (target) column's dropdown structure
         if (typeof updateDropdownsUI === 'function') {
              updateDropdownsUI(currentColumnId);
         } else {
@@ -388,11 +359,10 @@ export function handleDropdownChange(event) {
         }
 
         // DO NOT trigger recalculate/permalink here; let the original event handler do it once.
-        return; // End processing for programmatic event
+        return;
     }
 
     // --- Regular User Event Processing ---
-    // console.log(`[handleDropdownChange ${currentColumnId}] Processing user change for level ${index} to "${value}"`);
 
     // --- 1. Update State for the Source Column ---
     const oldSelections = [...state.dropdownSelections];
@@ -461,8 +431,6 @@ export function handleDropdownChange(event) {
     });
 
     // --- 3. Update Source Column Dropdown UI ---
-    // Needs to happen after sync dispatch, so target event handlers can process based on old source UI if needed
-    // Needs to happen before recalculate, so recalculate sees the final UI state (though state matters more)
     if (typeof updateDropdownsUI === 'function') {
         updateDropdownsUI(currentColumnId);
     } else {
@@ -470,7 +438,6 @@ export function handleDropdownChange(event) {
     }
 
     // --- 4. Recalculate Global Image List & Update ALL Image Displays ---
-    // This should run ONCE after all state changes (source + targets) have settled.
     if (typeof recalculateCombinedImageList === 'function') {
          console.log(`[handleDropdownChange ${currentColumnId}] Triggering global recalculation.`);
          recalculateCombinedImageList();
@@ -478,7 +445,6 @@ export function handleDropdownChange(event) {
         console.error("[handleDropdownChange] recalculateCombinedImageList function not available.");
     }
 
-    // --- 5. Update Permalink ---
     updatePermalink();
 }
 
