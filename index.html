@@ -1,52 +1,256 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>&#8203;</title>
-  <link rel="stylesheet" href="css/styles.css">
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 95vh; /* overall window height */
-    }
-    
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Comparison Tool</title>
+    <style>
+        /* --- Root Variables and Body --- */
+        :root {
+            --bg-color: #f0f0f0; /* Light mode background */
+            --text-color: #333; /* Light mode text */
+            --column-bg: #fff; /* Light mode column background */
+            --border-color: #ccc;
+            --input-bg: #fff;
+            --input-border: #bbb;
+            --button-bg: #e0e0e0;
+            --button-hover-bg: #d0d0d0;
+            --accent-color: #007bff;
+            --danger-color: #dc3545;
+            --link-color: #0056b3; /* Light mode links */
+            --sync-checkbox-size: 16px;
+            --preview-bg: #f9f9f9;
+            --preview-border: #ddd;
+            --preview-hover-bg: #eee;
+            --preview-highlight-bg: #d6eaff; /* Added highlight color */
+            --preview-highlight-text: #0056b3; /* Added highlight text color */
+        }
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        body {
+            font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color);
+            display: flex; flex-direction: column; box-sizing: border-box; height: 100%;
+        }
+        body.dark-mode {
+            --bg-color: #333; /* Dark mode background */
+            --text-color: #f0f0f0; /* Dark mode text */
+            --column-bg: #444; /* Dark mode column background */
+            --border-color: #666;
+            --input-bg: #555;
+            --input-border: #777;
+            --button-bg: #555;
+            --button-hover-bg: #666;
+            --link-color: #90caf9; /* Dark mode links */
+            --preview-bg: #3a3a3a;
+            --preview-border: #555;
+            --preview-hover-bg: #484848;
+            --preview-highlight-bg: #0056b3; /* Dark mode highlight color */
+            --preview-highlight-text: #e0e0e0; /* Dark mode highlight text color */
+        }
+
+        /* --- Controls --- */
+        #controls {
+            padding: 10px; border-bottom: 1px solid var(--border-color); display: flex;
+            gap: 10px; align-items: center; flex-wrap: wrap; flex-shrink: 0;
+        }
+        #controls button, #controls label {
+            padding: 8px 12px; border: 1px solid var(--input-border); background-color: var(--button-bg);
+            color: var(--text-color); border-radius: 4px; cursor: pointer; transition: background-color 0.2s;
+        }
+        #controls button:hover { background-color: var(--button-hover-bg); }
+        #controls label { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: none; background: none; cursor: default; }
+        #controls input[type="checkbox"] { cursor: pointer; margin: 0; }
+
+        /* --- Columns Container --- */
+        #columnsContainer {
+            display: flex; gap: 10px; padding: 10px; flex-grow: 1;
+            min-height: 0; overflow-y: hidden; overflow-x: auto; box-sizing: border-box;
+        }
+
+        /* --- Column --- */
+        .column {
+            border: 1px solid var(--border-color); border-radius: 5px; padding: 10px; background-color: var(--column-bg);
+            display: flex; flex-direction: column; gap: 8px; flex-grow: 1; flex-shrink: 1; flex-basis: 0;
+            min-width: 250px; position: relative; box-sizing: border-box; overflow: hidden;
+        }
+        .column.dragging { opacity: 0.5; border: 2px dashed var(--accent-color); flex-grow: 0; }
+        .column.drag-over { border-left: 3px solid var(--accent-color); }
+
+        /* --- Elements within Column (Non-Growing) --- */
+        .column input[type="text"], .column select {
+            width: 100%; padding: 6px; border: 1px solid var(--input-border); background-color: var(--input-bg);
+            color: var(--text-color); border-radius: 3px; box-sizing: border-box; flex-shrink: 0;
+        }
+        .column input[type="text"].columnTitle {
+            font-weight: bold; /* BOLD TITLE */
+            font-size: 16pt;   /* TITLE SIZE */
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .column .searchContainer { flex-shrink: 0; }
+
+        /* --- Search Preview --- */
+        .searchContainer { position: relative; flex-shrink: 0; }
+        .searchResultsPreview {
+            position: absolute; background-color: var(--preview-bg); border: 1px solid var(--preview-border);
+            border-top: none; border-radius: 0 0 3px 3px; max-height: 150px; overflow-y: auto;
+            z-index: 10; width: 100%; box-sizing: border-box; display: none; font-size: 0.9em;
+        }
+        .searchResultsPreview div {
+            padding: 4px 8px; cursor: pointer; border-bottom: 1px solid var(--preview-border);
+              transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out; /* Smooth transition */
+              /* Default colors */
+              background-color: var(--preview-bg);
+              color: var(--text-color);
+        }
+        .searchResultsPreview div:last-child { border-bottom: none; }
+        .searchResultsPreview div:hover { background-color: var(--preview-hover-bg); }
+        .searchResultsPreview div.highlighted {
+            background-color: var(--preview-highlight-bg);
+            color: var(--preview-highlight-text);
+            font-weight: bold; /* Optional: make it bolder */
+        }
+        /* --- Dropdowns --- */
+        .dropdownLevel {
+             display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+        .dropdownLevel select { flex-grow: 1; min-width: 50px; }
+        .dropdownLevel input[type="checkbox"].syncCheckbox {
+            flex-shrink: 0; margin-left: 5px; cursor: pointer; width: var(--sync-checkbox-size);
+            height: var(--sync-checkbox-size); accent-color: var(--accent-color);
+        }
+        .dropdownContainer {
+            display: flex; flex-direction: column; gap: 5px;
+            flex-shrink: 0; /* Prevent shrinking */
+            /* Max height and scroll */
+            max-height: 180px; /* ADJUST AS NEEDED */
+            overflow-y: auto;
+            /* Optional styling */
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 5px;
+            padding-right: 35px;
+            /* Height will be set dynamically by JS to sync */
+            /* Remove fixed height if previously added */
+            /* height: auto; Default */
+            /* Add transition for smoother height changes? Optional */
+            transition: height 0.1s ease-out;
+        }
+        body.dark-mode .dropdownContainer { border-color: var(--border-color); }
+
+
+        /* --- === IMAGE CONTAINER AND CHILDREN === --- */
+        .imageContainer {
+            flex-grow: 1; /* Takes available vertical space */
+            flex-shrink: 1; /* Allow shrinking */
+            min-height: 100px; /* Minimum size */
+            background-color: #eee;
+            overflow: hidden; /* Clip image/link if they somehow exceed bounds */
+            position: relative; /* Required for absolute positioning of children */
+            box-sizing: border-box;
+            /* Remove top/left/right padding to maximize image area */
+            padding: 0;
+            /* Add padding ONLY at the bottom to reserve space for the link */
+            /* Adjust em value based on link font size + desired spacing */
+            padding-bottom: 2.5em;
+        }
+        body.dark-mode .imageContainer {
+            background-color: #2a2a2a;
+        }
+
+        .displayImage {
+            display: block;
+            /* Size constraints relative to the container's PADDING BOX */
+            /* (which is the container height MINUS the padding-bottom) */
+            width: 100%;
+            height: 100%;
+            max-height: 100%;
+            /* Scaling */
+            object-fit: contain;
+            image-rendering: auto;
+            /* Center horizontally */
+            margin-left: auto;
+            margin-right: auto;
+            /* Position within the flow (respects container padding) */
+            position: relative; /* Keep it in flow */
+            /* Ensure it doesn't overlap padding */
+            box-sizing: border-box;
+        }
+
+        .pdfLink {
+            /* --- Position Absolutely at the Bottom --- */
+            position: absolute;
+            bottom: 0; /* Stick to the container's bottom edge */
+            left: 0; /* Align left edge */
+            right: 0; /* Align right edge (stretches width) */
+
+            /* --- Styling --- */
+            /* Override potential margins */
+            margin: 0;
+            font-size: 0.9em;
+            color: var(--link-color);
+            text-decoration: none;
+            text-align: center;
+            box-sizing: border-box;
+            /* Vertical padding for spacing inside the link area */
+            padding: 6px 0; /* Adjust as needed */
+
+            /* --- Visibility --- */
+            /* JS will toggle display: none / display: block */
+            /* display: block; */ /* Default visible state if desired, JS should handle */
+
+            /* --- Make always 'visible' (occupy space) --- */
+            /* We don't need min-height because padding-bottom on container reserves space */
+            /* We rely on JS setting display: block/none correctly */
+        }
+        .pdfLink:hover {
+            text-decoration: underline;
+        }
+        /* --- === END IMAGE CONTAINER === --- */
+
+
+        /* --- Other Styles --- */
+        .deleteColumnBtn {
+            position: absolute; top: 5px; right: 5px; background-color: var(--danger-color); color: white;
+            border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 14px;
+            line-height: 18px; text-align: center; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; padding: 0; z-index: 1;
+        }
+        .deleteColumnBtn:hover { opacity: 1; }
+
+    </style>
 </head>
 <body>
-  <button id="darkModeToggle" class="dark-mode-toggle" title="Toggle Dark Mode" style="position: fixed; top: 5px; left: 5px; z-index: 10; font-size: 18px; padding: 2.5px 5px;">☀</button>
-  <h1>&#8203;</h1>
-  <!-- Global buttons -->
-  <button class="global-permalink-button" id="permalinkBtn" title="Copy permalink">🔗</button>
-  <input type="checkbox" id="syncChannelsCheckbox" checked style="margin-left:10px;">
-  <label for="syncChannelsCheckbox" style="cursor: pointer; font-size: 14px;">Sync Channels</label>
-  <select id="togglePathDropdown" style="margin-left:10px; display:none;">
-    <option value="log">Log</option>
-    <option value="linear">Linear</option>
-  </select>
-  <button class="global-add-button" id="globalAddBtn" title="Add new column">Add Column (right)</button>
-  <button class="global-prev-button" id="prevBtn" title="Previous Picture">◄</button>
-  <button class="global-next-button" id="nextBtn" title="Next Picture">►</button>
-  <!-- Picture status indicator -->
-  <div id="pictureStatus"></div>
-  <div id="columns" class="column-container"></div>
 
-  <script>
-    // Global variables
-    let activeColumns = [];  // each column record holds its available files etc.
-    let currentMasterOrder = []; // Master list from file_order.json (assumed common across all)
-    let currentPictureIndex = 0; // Global pointer for the common picture
-  </script>
-  <script src="js/generateId.js"></script>
-  <script src="js/populateFolderSuggestions.js"></script>
-  <script src="js/updateDisplayedPicture.js"></script>
-  <script src="js/selectSuggestion.js"></script>
-  <script src="js/createColumn.js"></script>
-  <script src="js/adjustColumnWidths.js"></script>
-  <script src="js/addColumn.js"></script>
-  <script src="js/fetchFolders.js"></script>
-  <script src="js/fetchChannels.js"></script>
-  <script src="js/getUnionFiles.js"></script>
-  <script src="js/globalButtonFunctionality.js" defer></script>
+    <div id="controls">
+        <button id="addColumnBtn">Add Column</button>
+        <button id="permalinkBtn">Copy Permalink</button>
+        <label>
+            <input type="checkbox" id="darkModeToggle"> Dark Mode
+        </label>
+    </div>
+
+    <div id="columnsContainer">
+        <!-- Columns will be dynamically added here -->
+    </div>
+
+    <template id="columnTemplate">
+        <div class="column" draggable="true">
+             <button class="deleteColumnBtn" title="Delete Column">×</button>
+             <input type="text" class="columnTitle" placeholder="Column Title">
+             <div class="searchContainer">
+                <input type="text" class="pathInput" placeholder="Path prefix (e.g., data/f1/f2)" autocomplete="off">
+                <div class="searchResultsPreview"></div>
+             </div>
+             <div class="dropdownContainer">
+                <!-- Dropdown levels added by JS -->
+             </div>
+             <div class="imageContainer">
+                 <img src="" alt="Selected Image" class="displayImage">
+                 <a href="#" class="pdfLink" target="_blank" style="display: none;">View PDF</a>
+             </div>
+        </div>
+    </template>
+
+    <!-- Load Modules -->
+    <script type="module" src="main.js"></script>
+
 </body>
 </html>
