@@ -74,6 +74,11 @@ function createColumnInstance(initialState = {}) {
                 if (event.target.tagName === 'SELECT') handlers.handleDropdownChange(event);
                 else if (event.target.tagName === 'INPUT' && event.target.classList.contains('syncCheckbox')) handlers.handleSyncCheckboxChange(event);
             });
+            if (handlers.handleDropdownKeyDown) {
+                dropdownContainer.addEventListener('keydown', (event) => {
+                    if (event.target.tagName === 'SELECT') handlers.handleDropdownKeyDown(event);
+                });
+            }
         }
 
         const deleteBtn = columnElement.querySelector('.deleteColumnBtn');

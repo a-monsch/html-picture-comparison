@@ -8,6 +8,96 @@ import {
 import { findMatchingPaths, recalculateCombinedImageList, navigateGlobalImageIndex } from './logic.js'; // Removed syncDropdowns
 import { debounce, parsePath, getNested, isValidPath } from './helpers.js';
 
+/**
+ * Handles all arrow key navigation when a dropdown is focused.
+ * - Up/Down: Changes the dropdown's selection, triggering UI updates and maintaining focus.
+ * - Left/Right: Triggers global image navigation and maintains focus.
+ * - Shift + Up/Down: Navigates focus vertically between dropdowns in the SAME column.
+ * - Shift + Left/Right: Navigates focus horizontally between dropdowns ACROSS columns.
+ */
+export function handleDropdownKeyDown(event) {
+    const select = event.target;
+    if (select.tagName !== 'SELECT') return;
+
+    // --- Block for Shift + Arrow Key Navigation ---
+    // This logic handles moving the FOCUS between different dropdown elements.
+    if (event.shiftKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        // Prevent any default browser action (like scrolling or changing the select value).
+        event.preventDefault();
+
+        const currentColumn = select.closest('.column');
+        const currentLevel = parseInt(select.dataset.levelIndex, 10);
+
+        if (!currentColumn || isNaN(currentLevel)) return;
+
+        // --- Vertical Navigation (Shift + Up/Down) ---
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            const direction = event.key === 'ArrowUp' ? -1 : 1;
+            const nextLevel = currentLevel + direction;
+
+            // Find the next dropdown within the SAME column.
+            const targetSelect = currentColumn.querySelector(`select[data-level-index="${nextLevel}"]`);
+
+            if (targetSelect) {
+                console.log(`[handleDropdownKeyDown] Shift-navigated focus within column ${currentColumn.dataset.id} to level ${nextLevel}.`);
+                targetSelect.focus();
+            }
+        }
+        // --- Horizontal Navigation (Shift + Left/Right) ---
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            const allColumns = Array.from(document.querySelectorAll('#columnsContainer .column'));
+            const currentColumnIndex = allColumns.indexOf(currentColumn);
+
+            if (currentColumnIndex === -1) return;
+
+            const direction = event.key === 'ArrowLeft' ? -1 : 1;
+            const nextColumnIndex = (currentColumnIndex + direction + allColumns.length) % allColumns.length;
+
+            const nextColumn = allColumns[nextColumnIndex];
+            if (nextColumn) {
+                // Find the dropdown at the SAME LEVEL in the next column.
+                const targetSelect = nextColumn.querySelector(`select[data-level-index="${currentLevel}"]`);
+                if (targetSelect) {
+                    console.log(`[handleDropdownKeyDown] Shift-navigated focus to column ${nextColumn.dataset.id} at level ${currentLevel}.`);
+                    targetSelect.focus();
+                }
+            }
+        }
+    }
+
+    // --- Block for changing the dropdown's VALUE (No Shift key) ---
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        const oldValue = select.value;
+        const columnId = select.closest('.column')?.dataset.id;
+        const levelIndex = select.dataset.levelIndex;
+
+        setTimeout(() => {
+            const newValue = select.value;
+            if (oldValue !== newValue) {
+                const changeEvent = new Event('change', { bubbles: true });
+                select.dispatchEvent(changeEvent);
+
+                setTimeout(() => {
+                    const newColumnElement = getColumnElement(columnId);
+                    const newSelectElement = newColumnElement?.querySelector(`select[data-level-index="${levelIndex}"]`);
+                    if (newSelectElement) newSelectElement.focus();
+                }, 0);
+            }
+        }, 10);
+    }
+
+    // --- Block for changing the global IMAGE (No Shift key) ---
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowLeft' ? -1 : 1;
+        if (typeof navigateGlobalImageIndex === 'function') {
+            navigateGlobalImageIndex(direction);
+            if (typeof updatePermalink === 'function') updatePermalink();
+        }
+        select.focus();
+    }
+}
+
 let draggedColumnElement = null;
 /**
  * Updates the state and UI based on the current value of the path input.
